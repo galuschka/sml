@@ -94,9 +94,12 @@ void Sml::start()
     if (mRoot)
         delete mRoot;
     mRoot = new SmlObj{};
+    mParsing = mRoot;
+/*
     mRoot->mCount = 1;
     mRoot->mVal.list = new SmlObj( (u8) Type::List, mRoot );
     mParsing = mRoot->mVal.list;
+*/
 }
 
 void Sml::show()
@@ -111,7 +114,7 @@ void Sml::show()
 SmlObj::SmlObj()  // constructor for root only
       : mVal(),
         mType( Type::List ),
-        mSize( 1 ),
+        mSize( 0 ),
         mCount( 0 ),
         mNext( nullptr ),
         mParent( nullptr )
@@ -217,7 +220,10 @@ SmlObj * SmlObj::parse( u8 byte )
 
 void SmlObj::showobj( u8 indent )
 {
-    printf( "%*s", indent * 4, "" );
+    static char typechar[] = { 'o','e','e','e','b','i','u','l' };
+    printf( "%*s%c%d: ", indent * 4, "", typechar[(u8) mType >> 4],
+                mSize * (((mType == Type::Integer) || (mType == Type::Unsigned))
+                        ? 8 : 1) );
     u8 i;
     SmlObj * elem;
 
@@ -248,25 +254,29 @@ void SmlObj::showobj( u8 indent )
         case Type::Integer:
             switch (mSize) {
                 case 0:
-                case 1:  printf(   "%d = 0x%0*x"   "\n", mVal._i8 , mSize*2, mVal._u8  ); break;
-                case 2:  printf(   "%d = 0x%0*x"   "\n", mVal._i16, mSize*2, mVal._u16 ); break;
+                case 1:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u8,  mVal._i8  ); break;
+                case 2:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u16, mVal._i16 ); break;
                 case 3:
-                case 4:  printf(  "%ld = 0x%0*lx"  "\n",      (long) mVal._i32, mSize*2,
-                                                     (unsigned long) mVal._u32 ); break;
-                default: printf( "%lld = 0x%0*llx" "\n", (long long) mVal._i64, mSize*2,
-                                                (unsigned long long) mVal._u64 ); break;
+                case 4:  printf( "0x%0*lx"  " = %ld"  "\n", mSize*2,
+                                                     (unsigned long) mVal._u32,
+                                                              (long) mVal._i32 ); break;
+                default: printf( "0x%0*llx" " = %lld" "\n", mSize*2,
+                                                (unsigned long long) mVal._u64,
+                                                         (long long) mVal._i64 ); break;
             }
             break;
         case Type::Unsigned:
             switch (mSize) {
                 case 0:
-                case 1:  printf(   "%u = 0x%0*x"   "\n", mVal._u8 , mSize*2, mVal._u8  ); break;
-                case 2:  printf(   "%u = 0x%0*x"   "\n", mVal._u16, mSize*2, mVal._u16 ); break;
+                case 1:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u8,  mVal._u8  ); break;
+                case 2:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u16, mVal._u16 ); break;
                 case 3:
-                case 4:  printf(  "%lu = 0x%0*lx"  "\n", (unsigned long)      mVal._u32, mSize*2,
-                                                         (unsigned long)      mVal._u32 ); break;
-                default: printf( "%llu = 0x%0*llx" "\n", (unsigned long long) mVal._u64, mSize*2,
-                                                         (unsigned long long) mVal._u64 ); break;
+                case 4:  printf( "0x%0*lx"  " = %lu"  "\n", mSize*2,
+                                                     (unsigned long) mVal._u32,
+                                                     (unsigned long) mVal._i32 ); break;
+                default: printf( "0x%0*llx" " = %llu" "\n", mSize*2,
+                                                (unsigned long long) mVal._u64,
+                                                (unsigned long long) mVal._i64 ); break;
             }
             break;
         default:
