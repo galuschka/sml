@@ -1,5 +1,6 @@
 #include "sml.h"
 #include <stdio.h>
+#include <string.h>	// memset()
 
 const char Sml::sTypechar[]  = { 'o','?','?','?','b','i','u','L' };
 const u8   Sml::sTypePlus1   = { (1 << (Type::ByteStr  >> Byte::TypeShift))
@@ -117,13 +118,9 @@ void Sml::parse( u8 byte )
             mParsing = objParse( byte );
 
             if (! mParsing && (mStatus != Status::Parse)) {
-            	mByteCnt = 0;
                 if (mStatus == Status::EscBegin) {
                     onReady( mErr, byte );
-                } else {
-                    mStatus = Status::EscEnd;
-                    if (byte == Byte::Escape)
-                        mByteCnt = 1;
+                    mByteCnt = 0;
                 }
             }
             break;
@@ -160,8 +157,14 @@ void Sml::start()
 
 idx Sml::abort( u8 err )
 {
-    mStatus = Status::EscBegin;
     mErr = err;
+    if (err == Err::NoError) {
+    	mByteCnt = 1;
+    	mStatus = Status::EscEnd;
+    } else {
+    	mByteCnt = 0;
+    	mStatus = Status::EscBegin;
+    }
     return( 0 );
 }
 
@@ -187,9 +190,9 @@ idx Sml::newObj( u8 byte, idx parent )  // object constructor
 	    --byte;
 
 	p->mParent   = parent;
-	p->mNext	   = 0;
+	p->mNext	 = 0;
 	p->mTypeSize = byte;
-	p->mVal 	   = 0;
+	p->mVal 	 = 0;
 
 	if (((p->mTypeSize & Byte::TypeMask) != Type::List) &&
 		((p->mTypeSize & Byte::SizeMask) > 1))
@@ -203,12 +206,22 @@ idx Sml::newObj( u8 byte, idx parent )  // object constructor
 
 idx Sml::newData( u8 size )
 {
-	const u8 nofObjs = (size + sizeof(SmlObj) - 1) / sizeof(SmlObj);
+	u8 effsize = size;
+	switch( size )
+	{
+	case 1:	effsize = sizeof(u8); break;
+	case 2:	effsize = sizeof(u16); break;
+	case 4:	effsize = sizeof(u32); break;
+	case 8:	effsize = sizeof(u64); break;
+	default: break;
+	}
+	const u8 nofObjs = (effsize + sizeof(SmlObj) - 1) / sizeof(SmlObj);
 
 	if (mObjCnt >= (cMaxNofObj - nofObjs))
 		return( 0 );
 	const idx ret = mObjCnt;
 	mObjCnt += nofObjs;
+	memset( bytes(ret), 0, effsize );
 	return( ret );
 }
 
@@ -220,8 +233,10 @@ idx Sml::objParse( u8 byte )
         case Type::List:
             if (byte == Byte::MsgEnd)
                 break;
+
             if (byte == Byte::Escape)
-                return( 0 );
+                return( abort( Err::NoError ) );
+
             if ((sTypeInvalid >> (byte >> Byte::TypeShift)) & 1)
                 return( abort( Err::InvalidType ) );
 
@@ -252,10 +267,15 @@ idx Sml::objParse( u8 byte )
             break;
 
         default:
-        	if ((p->mTypeSize & Byte::SizeMask) > 1)
-        		*uns64(p->mVal) = (*uns64(p->mVal) << 8) | byte;
-        	else
-        		p->mVal = byte;
+        	switch (p->mTypeSize & Byte::SizeMask)
+        	{
+        	case 0:
+        	case 1:  p->mVal = byte; break;
+        	case 2:  *uns16(p->mVal) = (*uns16(p->mVal) << 8) | byte; break;
+        	case 3:
+        	case 4:  *uns32(p->mVal) = (*uns32(p->mVal) << 8) | byte; break;
+        	default: *uns64(p->mVal) = (*uns64(p->mVal) << 8) | byte; break;
+        	}
             break;
     }
 
@@ -270,7 +290,7 @@ idx Sml::objParse( u8 byte )
         for (u8 depth = 0; depth < (cMaxListDepth - 1); ++depth)
         	mElemCnt[depth] = mElemCnt[depth + 1];
     }
-    return ret;
+    return( ret );
 }
 
 void Sml::objDump( idx o, u8 indent )
@@ -324,13 +344,13 @@ void Sml::objDump( idx o, u8 indent )
             switch (size)
             {
                 case 0:
-                case 1:  printf( "0x%0*x"   " = %d"   "\n", size*2, p->mVal, p->mVal ); break;
+                case 1:  printf( "0x%0*x"   " = %d"   "\n", size*2, p->mVal, (i8) p->mVal ); break;
                 case 2:  printf( "0x%0*x"   " = %d"   "\n", size*2, *uns16( p->mVal ),
                                                                     *int16( p->mVal ) ); break;
                 case 3:
-                case 4:  printf( "0x%0*lx"  " = %ld"  "\n", size*2, *uns32( p->mVal ),
+                case 4:  printf( "0x%0*x"   " = %d"   "\n", size*2, *uns32( p->mVal ),
                                                               	  	*int32( p->mVal ) ); break;
-                default: printf( "0x%0*llx" " = %lld" "\n", size*2, *uns64( p->mVal ),
+                default: printf( "0x%0*lx"  " = %ld"  "\n", size*2, *uns64( p->mVal ),
                                                          	 	 	*int64( p->mVal ) ); break;
             }
             break;
@@ -343,9 +363,9 @@ void Sml::objDump( idx o, u8 indent )
 				case 2:  printf( "0x%0*x"   " = %u"   "\n", size*2, *uns16( p->mVal ),
 																	*uns16( p->mVal ) ); break;
 				case 3:
-				case 4:  printf( "0x%0*lx"  " = %lu"  "\n", size*2, *uns32( p->mVal ),
+				case 4:  printf( "0x%0*x"   " = %u"   "\n", size*2, *uns32( p->mVal ),
 																	*uns32( p->mVal ) ); break;
-				default: printf( "0x%0*llx" " = %llu" "\n", size*2, *uns64( p->mVal ),
+				default: printf( "0x%0*lx"  " = %lu"  "\n", size*2, *uns64( p->mVal ),
 																	*uns64( p->mVal ) ); break;
             }
             break;

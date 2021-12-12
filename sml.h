@@ -4,17 +4,17 @@
 #include <stdint.h>
 #include "crc16.h"
 
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
+typedef uint8_t  	u8;
+typedef uint16_t 	u16;
+typedef uint32_t	u32;
+typedef uint64_t 	u64;
 
-typedef int8_t  i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
+typedef int8_t  	i8;
+typedef int16_t 	i16;
+typedef int32_t		i32;
+typedef int64_t		i64;
 
-typedef u8      idx;
+typedef u8			idx;
 
 const idx cMaxNofObj = 150;  // <- adjust according your needs
 const u8 cMaxListDepth = 10;  // while parsing nested list, we have to save old element counter
@@ -44,14 +44,7 @@ enum Type {
     List     = 0x70,
 };
 }
-/*
-enum class Size {
-    u8  = sizeof(u8),
-    u16 = sizeof(u16),
-    u32 = sizeof(u32),
-    u64 = sizeof(u64),
-};
-*/
+
 namespace Err {
 enum Err {
     NoError = 0,
@@ -87,15 +80,15 @@ class Sml
 
     idx 	 newObj(  u8 byte, idx parent );
     idx 	 newData( u8 size );
-    SmlObj * obj(   idx i ) { return( & mObj[i] ); }
+    SmlObj * obj( idx i ) { return( & mObj[i] ); }
 
-    u8     				* bytes( idx i ) { return( reinterpret_cast<u8  				*>(& mObj[i]) ); }
-    unsigned short    	* uns16( idx i ) { return( reinterpret_cast<unsigned short 		*>(& mObj[i]) ); }
-    unsigned long      	* uns32( idx i ) { return( reinterpret_cast<unsigned long  	   	*>(& mObj[i]) ); }
-    unsigned long long 	* uns64( idx i ) { return( reinterpret_cast<unsigned long long 	*>(& mObj[i]) ); }
-    short    			* int16( idx i ) { return( reinterpret_cast<short 				*>(& mObj[i]) ); }
-	long    			* int32( idx i ) { return( reinterpret_cast<long 				*>(& mObj[i]) ); }
-	long long    		* int64( idx i ) { return( reinterpret_cast<long long 			*>(& mObj[i]) ); }
+    u8  * bytes( idx i ) { return( reinterpret_cast<u8  *>(& mObj[i]) ); }
+    u16 * uns16( idx i ) { return( reinterpret_cast<u16	*>(& mObj[i]) ); }
+    u32 * uns32( idx i ) { return( reinterpret_cast<u32	*>(& mObj[i]) ); }
+    u64 * uns64( idx i ) { return( reinterpret_cast<u64	*>(& mObj[i]) ); }
+    i16 * int16( idx i ) { return( reinterpret_cast<i16	*>(& mObj[i]) ); }
+	i32 * int32( idx i ) { return( reinterpret_cast<i32	*>(& mObj[i]) ); }
+	i64 * int64( idx i ) { return( reinterpret_cast<i64 *>(& mObj[i]) ); }
 
   private:
 	idx  	 objParse( u8 byte );  // next input byte -> true: complete
