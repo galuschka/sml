@@ -16,8 +16,12 @@ typedef int64_t		i64;
 
 typedef u8			idx;
 
-const idx cMaxNofObj = 150;  // <- adjust according your needs
-const u8 cMaxListDepth = 10;  // while parsing nested list, we have to save old element counter
+const idx cMaxNofObj  	= 150;  // <- adjust according your needs
+const u8  cMaxListDepth  = 10;  // while parsing nested list, we have to save old element counter
+const u8  cMinNofEscBegin = 3;  // ok, when Byte::Begin after 3 Byte::Escape
+const u8  cNofEscBegin    = 4;  // usual number of Byte::Escape
+const u8  cNofBegin       = 4;  // number of Byte::Begin
+const u8  cNofEscEnd      = 4;  // number of Byte::Escape before Byte::End
 
 namespace Byte {
 enum Byte {

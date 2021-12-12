@@ -37,9 +37,10 @@ class SmlDump : public Sml
             	break;
         }
         dump();
-
+/*
         if (err == Err::NoError)
             exit( 0 );  // stop after 1st good frame
+*/
     }
 };
 

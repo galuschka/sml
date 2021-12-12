@@ -42,7 +42,7 @@ void Sml::parse( u8 byte )
                 ++mByteCnt;
                 return;
             }
-            if ((byte == Byte::Begin) && (mByteCnt >= 4)) {
+            if ((byte == Byte::Begin) && (mByteCnt >= cMinNofEscBegin)) {
                 mByteCnt = 1;
                 mStatus = Status::Begin;
                 return;
@@ -53,7 +53,7 @@ void Sml::parse( u8 byte )
         case Status::Begin:
             if (byte == Byte::Begin) {
                 ++mByteCnt;
-                if (mByteCnt == 4) {
+                if (mByteCnt == cNofBegin) {
                     mByteCnt = 0;
                     mStatus = Status::Parse;
                     start();
@@ -72,7 +72,7 @@ void Sml::parse( u8 byte )
                 ++mByteCnt;
                 return;
             }
-            if (mByteCnt >= 4) {
+            if (mByteCnt >= cNofEscEnd) {
                 if (byte == Byte::End) {
                     mByteCnt = 1;
                     mStatus = Status::End;
@@ -133,20 +133,14 @@ void Sml::parse( u8 byte )
 void Sml::start()
 {
     mObjCnt  = 0;
-    mOffset  = 7;
+    mOffset  = cNofEscBegin + cNofBegin - 1;
     mByteCnt = 0;
-    mParsing = newObj( 0x70, 0 );
+    mParsing = newObj( Type::List, 0 );
     mErr = Err::NoError;
 
     mCrc.init();
-    mCrc.add( Byte::Escape );
-    mCrc.add( Byte::Escape );
-    mCrc.add( Byte::Escape );
-    mCrc.add( Byte::Escape );
-    mCrc.add( Byte::Begin );
-    mCrc.add( Byte::Begin );
-    mCrc.add( Byte::Begin );
-    mCrc.add( Byte::Begin );
+    for (u8 i = 0; i < cNofEscBegin; ++i ) mCrc.add( Byte::Escape );
+    for (u8 i = 0; i < cNofBegin; 	 ++i ) mCrc.add( Byte::Begin );
 
 /*
     mRoot->mCount = 1;
