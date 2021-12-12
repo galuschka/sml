@@ -1,7 +1,6 @@
 #include "sml.h"
 #include <stdio.h>
 
-
 const char SmlObj::sTypechar[]  = { 'o','?','?','?','b','i','u','L' };
 const u8   SmlObj::sTypePlus1   = { (1 << ((u8) Type::ByteStr  >> (u8) Byte::TypeShift))
                                   | (1 << ((u8) Type::Boolean  >> (u8) Byte::TypeShift))
@@ -16,7 +15,11 @@ const u8   SmlObj::sTypeInvalid = { (1 << ((u8) Type::Invalid1 >> (u8) Byte::Typ
                                   | (1 << ((u8) Type::Invalid3 >> (u8) Byte::TypeShift))
                                   };
 
-Sml::Sml() : mStatus{Status::EscBegin}, mEscCnt{0}, mRoot{nullptr}, mParsing{nullptr}
+Sml::Sml() : mCrc{},
+             mStatus{Status::EscBegin},
+             mEscCnt{0},
+             mRoot{nullptr},
+             mParsing{nullptr}
 {
 }
 
@@ -60,6 +63,7 @@ void Sml::parse( u8 byte )
             return;
 
         case (u8) Status::EscEnd:
+            mCrc.add(byte);
             if (byte == (u8) Byte::Escape) {
                 ++mEscCnt;
                 return;
@@ -86,16 +90,24 @@ void Sml::parse( u8 byte )
             // mEscCnt == 3 ==> byte 2nd CRC value
             switch (++mEscCnt)
             {
-                case 3: mCrcRead = (u16) byte << 8; break;
-                case 4: mCrcRead |= byte;
-                    onReady( /* (mCrcRead != mCrcCalc)
-                                ?   Err::CrcError
-                                :*/ Err::NoError, byte );
+                case 2:
+                    mCrc.add(byte);
+                    break;
+                case 3:
+                    mCrcRead = byte;
+                    break;
+                case 4:
+                    mCrcRead |= (u16) byte << 8;
+                    onReady( mCrcRead != mCrc.get()
+                                ? Err::CrcError
+                                : Err::NoError, byte );
                     mStatus = Status::EscBegin;
+                    break;
             }
             return;
 
         case (u8) Status::Parse:
+            mCrc.add(byte);
             if (mParsing)
                 mParsing = mParsing->parse( byte, *this );
             if (! mParsing) {
@@ -118,6 +130,17 @@ void Sml::start()
     mRoot = new SmlObj{};
     mParsing = mRoot;
     mOffset = 7;
+    
+    mCrc.init();
+    mCrc.add( (u8) Byte::Escape );
+    mCrc.add( (u8) Byte::Escape );
+    mCrc.add( (u8) Byte::Escape );
+    mCrc.add( (u8) Byte::Escape );
+    mCrc.add( (u8) Byte::Begin );
+    mCrc.add( (u8) Byte::Begin );
+    mCrc.add( (u8) Byte::Begin );
+    mCrc.add( (u8) Byte::Begin );
+
 /*
     mRoot->mCount = 1;
     mRoot->mVal.list = new SmlObj( (u8) Type::List, mRoot );

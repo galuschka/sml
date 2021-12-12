@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "crc16.h"
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -71,9 +72,9 @@ class Sml
     virtual void onReady( Err err, u8 byte ) = 0;  // method called on parsing complete/abort
 
   protected:
-    u16      mCrcCalc; // calculated by input data
     u16      mCrcRead; // CRC from input data
     u16      mOffset;  // position in frame
+    Crc      mCrc;
   private:
     Status   mStatus;
     u8       mEscCnt;  // number of escape chars read

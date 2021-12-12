@@ -17,9 +17,9 @@ class SmlDump : public Sml
                                                 byte, mOffset );
                 break;
             case Err::CrcError:
-                printf( "\n!!! CRC error: calc = %04x / read = %04x !!!"
+                printf( "\n!!! CRC error: read %04x / calc %04x !!!"
                         " (the following packet is invalid)\n",
-                                                mCrcCalc, mCrcRead );
+                                                mCrcRead, mCrc.get() );
                 break;
         }
         show();
