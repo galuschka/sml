@@ -1,5 +1,20 @@
 #include "sml.h"
-#include <stdexcept>
+#include <stdio.h>
+
+
+const char SmlObj::sTypechar[]  = { 'o','?','?','?','b','i','u','L' };
+const u8   SmlObj::sTypePlus1   = { (1 << ((u8) Type::ByteStr  >> (u8) Byte::TypeShift))
+                                  | (1 << ((u8) Type::Boolean  >> (u8) Byte::TypeShift))
+                                  | (1 << ((u8) Type::Integer  >> (u8) Byte::TypeShift))
+                                  | (1 << ((u8) Type::Unsigned >> (u8) Byte::TypeShift))
+                                  };
+const u8   SmlObj::sTypeInt     = { (1 << ((u8) Type::Integer  >> (u8) Byte::TypeShift))                                 
+                                  | (1 << ((u8) Type::Unsigned >> (u8) Byte::TypeShift))
+                                  };
+const u8   SmlObj::sTypeInvalid = { (1 << ((u8) Type::Invalid1 >> (u8) Byte::TypeShift))                                 
+                                  | (1 << ((u8) Type::Invalid2 >> (u8) Byte::TypeShift))
+                                  | (1 << ((u8) Type::Invalid3 >> (u8) Byte::TypeShift))
+                                  };
 
 Sml::Sml() : mStatus{Status::EscBegin}, mEscCnt{0}, mRoot{nullptr}, mParsing{nullptr}
 {
@@ -11,6 +26,8 @@ Sml::~Sml()
 
 void Sml::parse( u8 byte )
 {
+    ++mOffset;
+
     switch ((u8) mStatus)
     {
         case (u8) Status::EscBegin:
@@ -71,19 +88,24 @@ void Sml::parse( u8 byte )
             {
                 case 3: mCrcRead = (u16) byte << 8; break;
                 case 4: mCrcRead |= byte;
-                    // if (mCrcRead == mCrcCalc)
-                        show();
+                    onReady( /* (mCrcRead != mCrcCalc)
+                                ?   Err::CrcError
+                                :*/ Err::NoError, byte );
                     mStatus = Status::EscBegin;
             }
             return;
 
         case (u8) Status::Parse:
             if (mParsing)
-                mParsing = mParsing->parse( byte );
+                mParsing = mParsing->parse( byte, *this );
             if (! mParsing) {
-                mStatus = Status::EscEnd;
-                if (byte == (u8) Byte::Escape)
-                    mEscCnt = 1;
+                if (mStatus == Status::EscBegin) {
+                    onReady( Err::InvalidType, byte );
+                } else {
+                    mStatus = Status::EscEnd;
+                    if (byte == (u8) Byte::Escape)
+                        mEscCnt = 1;
+                }
             }
             return;
     }
@@ -95,11 +117,17 @@ void Sml::start()
         delete mRoot;
     mRoot = new SmlObj{};
     mParsing = mRoot;
+    mOffset = 7;
 /*
     mRoot->mCount = 1;
     mRoot->mVal.list = new SmlObj( (u8) Type::List, mRoot );
     mParsing = mRoot->mVal.list;
 */
+}
+
+void Sml::abort()
+{
+    mStatus = Status::EscBegin;
 }
 
 void Sml::show()
@@ -170,7 +198,7 @@ SmlObj::~SmlObj()
     }
 }
 
-SmlObj * SmlObj::parse( u8 byte )
+SmlObj * SmlObj::parse( u8 byte, Sml & sml )
 {
     switch (mType)
     {
@@ -179,7 +207,11 @@ SmlObj * SmlObj::parse( u8 byte )
                 break;
             if (byte == (u8) Byte::Escape)
                 return nullptr;
-            
+            if ((sTypeInvalid >> (byte >> (u8) Byte::TypeShift)) & 1) {
+                sml.abort();
+                return nullptr;
+            }
+            /*
             switch (byte)
             {
                 case (u8) Type::Invalid1:
@@ -187,6 +219,7 @@ SmlObj * SmlObj::parse( u8 byte )
                 case (u8) Type::Invalid3:
                     throw std::runtime_error("invalid type byte");
             }
+            */
             {
                 SmlObj ** link = & mVal.list;
                 while (*link) link = & (*link)->mNext;
@@ -220,10 +253,10 @@ SmlObj * SmlObj::parse( u8 byte )
 
 void SmlObj::showobj( u8 indent )
 {
-    static char typechar[] = { 'o','e','e','e','b','i','u','l' };
-    printf( "%*s%c%d: ", indent * 4, "", typechar[(u8) mType >> 4],
-                mSize * (((mType == Type::Integer) || (mType == Type::Unsigned))
-                        ? 8 : 1) );
+    printf( "%*s%c%d-%02x: ", indent * 4, "",
+                sTypechar[(u8) mType >> (u8) Byte::TypeShift],
+                mSize * ((((sTypeInt >> ((u8) mType >> (u8) Byte::TypeShift)) & 1) * 7) + 1),
+                (u8) mType | (mSize + ((sTypePlus1 >> ((u8) mType >> (u8) Byte::TypeShift)) & 1)) );
     u8 i;
     SmlObj * elem;
 
@@ -242,7 +275,8 @@ void SmlObj::showobj( u8 indent )
             break;
 
         case Type::List:
-            puts( "list:" );
+            // puts( "list of %d elements", mSize );
+            puts( "" );
             i = 0;
             for (elem = mVal.list; elem; elem = elem->mNext) {
                 printf( "%*s %d/%d:\n", indent * 4, "", ++i, mSize );

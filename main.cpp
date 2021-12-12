@@ -1,10 +1,37 @@
 
 #include "sml.h"
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+class SmlDump : public Sml
+{
+    void onReady( Err err, u8 byte ) {
+        switch (err)
+        {
+            case Err::NoError:
+                break;
+            case Err::InvalidType:
+                printf( "\n!!! invalid type: char %02x at offset %d !!!"
+                        " (the following packet is invalid)\n",
+                                                byte, mOffset );
+                break;
+            case Err::CrcError:
+                printf( "\n!!! CRC error: calc = %04x / read = %04x !!!"
+                        " (the following packet is invalid)\n",
+                                                mCrcCalc, mCrcRead );
+                break;
+        }
+        show();
+
+        if (err == Err::NoError)
+            exit( 0 );  // stop after 1st good frame
+    }
+};
 
 int main( int argc, char ** argv )
 {
-    Sml sml{};
+    SmlDump sml{};
 
     u8 byte;
     while (read( 0, & byte, 1 ) == 1) {

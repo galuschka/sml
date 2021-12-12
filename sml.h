@@ -22,6 +22,7 @@ enum class Byte {
     SizeMask = 0x0f,
     TypeMask = 0x70,
     OtherBit = 0x80,
+    TypeShift = 4,  // type >> 4 is basic type value
 };
 enum class Type {
     ByteStr  =    0,
@@ -41,6 +42,11 @@ enum class Size {
     u64 = sizeof(u64),
 };
 */
+enum class Err {
+    NoError = 0,
+    InvalidType,
+    CrcError,
+};
 
 class SmlObj;
 
@@ -60,18 +66,28 @@ class Sml
     void parse( u8 byte );  // parse next input byte
     void start();           // start parsing objects (behind esc begin)
     void show();            // dump the struct
+    void abort();           // set to abort parsing (on type error)
 
+    virtual void onReady( Err err, u8 byte ) = 0;  // method called on parsing complete/abort
+
+  protected:
+    u16      mCrcCalc; // calculated by input data
+    u16      mCrcRead; // CRC from input data
+    u16      mOffset;  // position in frame
   private:
     Status   mStatus;
     u8       mEscCnt;  // number of escape chars read
     SmlObj * mRoot;    // root object: list of 3 or more objects
     SmlObj * mParsing; // pointer to currently parsed object
-    u16      mCrcCalc; // calculated by input data
-    u16      mCrcRead; // CRC from input data
 };
 
 class SmlObj
 {
+    static const char sTypechar[];
+    static const u8   sTypePlus1;
+    static const u8   sTypeInt;
+    static const u8   sTypeInvalid;
+
   public:
     SmlObj();
     SmlObj( u8 byte, SmlObj * parent );
@@ -96,6 +112,6 @@ class SmlObj
     SmlObj * mNext;     // next element in same list (nil when last)
     SmlObj * mParent;   // parent list (the list containing this)
 
-    SmlObj * parse( u8 byte );  // next input byte -> true: complete
+    SmlObj * parse( u8 byte, Sml & sml );  // next input byte -> true: complete
     void     showobj( u8 indent );
 };
