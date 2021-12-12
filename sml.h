@@ -14,7 +14,13 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
-enum class Byte {
+typedef u8      idx;
+
+const idx cMaxNofObj = 150;  // <- adjust according your needs
+const u8 cMaxListDepth = 10;  // while parsing nested list, we have to save old element counter
+
+namespace Byte {
+enum Byte {
     MsgEnd   = 0,
     Skip     = 1,  // optional
     Begin    = 1,
@@ -25,7 +31,9 @@ enum class Byte {
     OtherBit = 0x80,
     TypeShift = 4,  // type >> 4 is basic type value
 };
-enum class Type {
+}
+namespace Type {
+enum Type {
     ByteStr  =    0,
     Invalid1 = 0x10,
     Invalid2 = 0x20,
@@ -35,6 +43,7 @@ enum class Type {
     Unsigned = 0x60,
     List     = 0x70,
 };
+}
 /*
 enum class Size {
     u8  = sizeof(u8),
@@ -43,76 +52,81 @@ enum class Size {
     u64 = sizeof(u64),
 };
 */
-enum class Err {
+namespace Err {
+enum Err {
     NoError = 0,
+    OutOfMemory,	// cMaxNofObj too small
     InvalidType,
     CrcError,
 };
+}
 
-class SmlObj;
+class Sml;
+
+class SmlObj
+{
+  public:
+    idx      mParent;   // parent list (the list containing this)
+    idx      mNext;     // next element in same list (nil when last)
+    u8       mTypeSize; // type and number of ... (or 0 when root list)
+    idx      mVal;      // byte value or index to list or index to value
+};
 
 class Sml
 {
   public:
-    enum class Status {
-        EscBegin,
-        Begin,
-        Parse,
-        EscEnd,
-        End
-    };
     Sml();
-    ~Sml();
+    virtual ~Sml() = 0;
 
     void parse( u8 byte );  // parse next input byte
     void start();           // start parsing objects (behind esc begin)
-    void show();            // dump the struct
-    void abort();           // set to abort parsing (on type error)
+    void dump();            // dump the struct
+    idx  abort( u8 err );   // set to abort parsing (on type error)
 
-    virtual void onReady( Err err, u8 byte ) = 0;  // method called on parsing complete/abort
+    virtual void onReady( u8 err, u8 byte ) = 0;  // method called on parsing complete/abort
+
+    idx 	 newObj(  u8 byte, idx parent );
+    idx 	 newData( u8 size );
+    SmlObj * obj(   idx i ) { return( & mObj[i] ); }
+
+    u8     				* bytes( idx i ) { return( reinterpret_cast<u8  				*>(& mObj[i]) ); }
+    unsigned short    	* uns16( idx i ) { return( reinterpret_cast<unsigned short 		*>(& mObj[i]) ); }
+    unsigned long      	* uns32( idx i ) { return( reinterpret_cast<unsigned long  	   	*>(& mObj[i]) ); }
+    unsigned long long 	* uns64( idx i ) { return( reinterpret_cast<unsigned long long 	*>(& mObj[i]) ); }
+    short    			* int16( idx i ) { return( reinterpret_cast<short 				*>(& mObj[i]) ); }
+	long    			* int32( idx i ) { return( reinterpret_cast<long 				*>(& mObj[i]) ); }
+	long long    		* int64( idx i ) { return( reinterpret_cast<long long 			*>(& mObj[i]) ); }
+
+  private:
+	idx  	 objParse( u8 byte );  // next input byte -> true: complete
 
   protected:
-    u16      mCrcRead; // CRC from input data
-    u16      mOffset;  // position in frame
-    Crc      mCrc;
+    u16      mOffset;   // position in frame
+    u16      mCrcRead;  // CRC from input data
+    Crc      mCrc;		// updated on each byte received
+
   private:
-    Status   mStatus;
-    u8       mEscCnt;  // number of escape chars read
-    SmlObj * mRoot;    // root object: list of 3 or more objects
-    SmlObj * mParsing; // pointer to currently parsed object
-};
+    u8       mStatus;	// Status
+    u8		 mErr;
+    u8       mByteCnt; 	// common byte counter
+    idx      mObjCnt;   // next free object index
+    idx 	 mParsing;  // pointer to currently parsed object
+    SmlObj   mObj[cMaxNofObj]; // storage of objects
+    idx		 mElemCnt[cMaxListDepth];  // to stack the list elements counters
 
-class SmlObj
-{
-    static const char sTypechar[];
-    static const u8   sTypePlus1;
-    static const u8   sTypeInt;
-    static const u8   sTypeInvalid;
+    enum Status {
+    	EscBegin,	// 4x Byte::Escape -> Status::Begin
+		Begin,		// 4x Byte::Begin  -> Status::Parse
+		Parse,		// on Byte::Escape -> Status::EscEnd
+		EscEnd,		// 4x Byte::Escape -> Status::End
+		End			// 4x Bytes (CRC)  -> Status::EscBegin
+	};
 
-  public:
-    SmlObj();
-    SmlObj( u8 byte, SmlObj * parent );
-    ~SmlObj();
+    void     objDump( idx o, u8 indent );
 
-    union Value {
-        Value() { _u64 = 0LL; }
-        u8     * byteStr;
-        i8       _i8;
-        i16      _i16;
-        i32      _i32;
-        i64      _i64;
-        u8       _u8;
-        u16      _u16;
-        u32      _u32;
-        u64      _u64;
-        SmlObj * list;  // sub list
-    }        mVal;
-    Type     mType;     // Type::...
-    u8       mSize;     // number of ... (or 0 when root list)
-    u8       mCount;    // how many bytes / elements read so far
-    SmlObj * mNext;     // next element in same list (nil when last)
-    SmlObj * mParent;   // parent list (the list containing this)
-
-    SmlObj * parse( u8 byte, Sml & sml );  // next input byte -> true: complete
-    void     showobj( u8 indent );
+  private:
+	static const char sTypechar[];
+	static const u8   sTypePlus1;
+	static const u8   sTypeInt;
+	static const u8   sTypeInvalid;
 };

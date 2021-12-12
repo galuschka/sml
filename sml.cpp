@@ -1,25 +1,28 @@
 #include "sml.h"
 #include <stdio.h>
 
-const char SmlObj::sTypechar[]  = { 'o','?','?','?','b','i','u','L' };
-const u8   SmlObj::sTypePlus1   = { (1 << ((u8) Type::ByteStr  >> (u8) Byte::TypeShift))
-                                  | (1 << ((u8) Type::Boolean  >> (u8) Byte::TypeShift))
-                                  | (1 << ((u8) Type::Integer  >> (u8) Byte::TypeShift))
-                                  | (1 << ((u8) Type::Unsigned >> (u8) Byte::TypeShift))
-                                  };
-const u8   SmlObj::sTypeInt     = { (1 << ((u8) Type::Integer  >> (u8) Byte::TypeShift))                                 
-                                  | (1 << ((u8) Type::Unsigned >> (u8) Byte::TypeShift))
-                                  };
-const u8   SmlObj::sTypeInvalid = { (1 << ((u8) Type::Invalid1 >> (u8) Byte::TypeShift))                                 
-                                  | (1 << ((u8) Type::Invalid2 >> (u8) Byte::TypeShift))
-                                  | (1 << ((u8) Type::Invalid3 >> (u8) Byte::TypeShift))
-                                  };
+const char Sml::sTypechar[]  = { 'o','?','?','?','b','i','u','L' };
+const u8   Sml::sTypePlus1   = { (1 << (Type::ByteStr  >> Byte::TypeShift))
+							   | (1 << (Type::Boolean  >> Byte::TypeShift))
+							   | (1 << (Type::Integer  >> Byte::TypeShift))
+							   | (1 << (Type::Unsigned >> Byte::TypeShift))
+							   };
+const u8   Sml::sTypeInt     = { (1 << (Type::Integer  >> Byte::TypeShift))
+							   | (1 << (Type::Unsigned >> Byte::TypeShift))
+							   };
+const u8   Sml::sTypeInvalid = { (1 << (Type::Invalid1 >> Byte::TypeShift))
+							   | (1 << (Type::Invalid2 >> Byte::TypeShift))
+							   | (1 << (Type::Invalid3 >> Byte::TypeShift))
+							   };
 
-Sml::Sml() : mCrc{},
-             mStatus{Status::EscBegin},
-             mEscCnt{0},
-             mRoot{nullptr},
-             mParsing{nullptr}
+Sml::Sml() : mOffset{  0 },
+			 mCrcRead{ 0 },
+			 mCrc{},
+             mStatus{ Status::EscBegin },
+			 mErr{ Err::NoError },
+			 mByteCnt{ 0 },
+			 mObjCnt{  0 },
+			 mParsing{ 0 }
 {
 }
 
@@ -31,64 +34,64 @@ void Sml::parse( u8 byte )
 {
     ++mOffset;
 
-    switch ((u8) mStatus)
+    switch (mStatus)
     {
-        case (u8) Status::EscBegin:
-            if (byte == (u8) Byte::Escape) {
-                ++mEscCnt;
+        case Status::EscBegin:
+            if (byte == Byte::Escape) {
+                ++mByteCnt;
                 return;
             }
-            if ((byte == (u8) Byte::Begin) && (mEscCnt >= 4)) {
-                mEscCnt = 1;
+            if ((byte == Byte::Begin) && (mByteCnt >= 4)) {
+                mByteCnt = 1;
                 mStatus = Status::Begin;
                 return;
             }
-            mEscCnt = 0;
-            return;
+            mByteCnt = 0;
+            break;
 
-        case (u8) Status::Begin:
-            if (byte == (u8) Byte::Begin) {
-                ++mEscCnt;
-                if (mEscCnt == 4) {
-                    mEscCnt = 0;
+        case Status::Begin:
+            if (byte == Byte::Begin) {
+                ++mByteCnt;
+                if (mByteCnt == 4) {
+                    mByteCnt = 0;
                     mStatus = Status::Parse;
                     start();
                 }
                 return;
             }
-            mEscCnt = 0;
-            if (byte == (u8) Byte::Escape)
-                mEscCnt = 1;
+            mByteCnt = 0;
+            if (byte == Byte::Escape)
+                mByteCnt = 1;
             mStatus = Status::EscBegin;
-            return;
+            break;
 
-        case (u8) Status::EscEnd:
+        case Status::EscEnd:
             mCrc.add(byte);
-            if (byte == (u8) Byte::Escape) {
-                ++mEscCnt;
+            if (byte == Byte::Escape) {
+                ++mByteCnt;
                 return;
             }
-            if (mEscCnt >= 4) {
-                if (byte == (u8) Byte::End) {
-                    mEscCnt = 1;
+            if (mByteCnt >= 4) {
+                if (byte == Byte::End) {
+                    mByteCnt = 1;
                     mStatus = Status::End;
                     return;
                 }
-                if (byte == (u8) Byte::Begin) {
-                    mEscCnt = 1;
+                if (byte == Byte::Begin) {
+                    mByteCnt = 1;
                     mStatus = Status::Begin;
                     return;
                 }
             }
-            mEscCnt = 0;
+            mByteCnt = 0;
             // mStatus = Status::EscBegin;
-            return;
+            break;
 
-        case (u8) Status::End:
-            // mEscCnt == 1 ==> byte is number of fill bytes
-            // mEscCnt == 2 ==> byte 1st CRC value
-            // mEscCnt == 3 ==> byte 2nd CRC value
-            switch (++mEscCnt)
+        case Status::End:
+            // mByteCnt == 1 ==> byte is number of fill bytes
+            // mByteCnt == 2 ==> byte 1st CRC value
+            // mByteCnt == 3 ==> byte 2nd CRC value
+            switch (++mByteCnt)
             {
                 case 2:
                     mCrc.add(byte);
@@ -103,195 +106,201 @@ void Sml::parse( u8 byte )
                                 : Err::NoError, byte );
                     mStatus = Status::EscBegin;
                     break;
-            }
-            return;
 
-        case (u8) Status::Parse:
+                default:
+                    break;
+            }
+        	break;
+
+        case Status::Parse:
             mCrc.add(byte);
-            if (mParsing)
-                mParsing = mParsing->parse( byte, *this );
-            if (! mParsing) {
+            mParsing = objParse( byte );
+
+            if (! mParsing && (mStatus != Status::Parse)) {
+            	mByteCnt = 0;
                 if (mStatus == Status::EscBegin) {
-                    onReady( Err::InvalidType, byte );
+                    onReady( mErr, byte );
                 } else {
                     mStatus = Status::EscEnd;
-                    if (byte == (u8) Byte::Escape)
-                        mEscCnt = 1;
+                    if (byte == Byte::Escape)
+                        mByteCnt = 1;
                 }
             }
-            return;
+            break;
+
+        default:
+        	break;
     }
 }
 
 void Sml::start()
 {
-    if (mRoot)
-        delete mRoot;
-    mRoot = new SmlObj{};
-    mParsing = mRoot;
-    mOffset = 7;
+    mObjCnt  = 0;
+    mOffset  = 7;
+    mByteCnt = 0;
+    mParsing = newObj( 0x70, 0 );
+    mErr = Err::NoError;
 
     mCrc.init();
-    mCrc.add( (u8) Byte::Escape );
-    mCrc.add( (u8) Byte::Escape );
-    mCrc.add( (u8) Byte::Escape );
-    mCrc.add( (u8) Byte::Escape );
-    mCrc.add( (u8) Byte::Begin );
-    mCrc.add( (u8) Byte::Begin );
-    mCrc.add( (u8) Byte::Begin );
-    mCrc.add( (u8) Byte::Begin );
+    mCrc.add( Byte::Escape );
+    mCrc.add( Byte::Escape );
+    mCrc.add( Byte::Escape );
+    mCrc.add( Byte::Escape );
+    mCrc.add( Byte::Begin );
+    mCrc.add( Byte::Begin );
+    mCrc.add( Byte::Begin );
+    mCrc.add( Byte::Begin );
 
 /*
     mRoot->mCount = 1;
-    mRoot->mVal.list = new SmlObj( (u8) Type::List, mRoot );
+    mRoot->mVal.list = new SmlObj( Type::List, mRoot );
     mParsing = mRoot->mVal.list;
 */
 }
 
-void Sml::abort()
+idx Sml::abort( u8 err )
 {
     mStatus = Status::EscBegin;
+    mErr = err;
+    return( 0 );
 }
 
-void Sml::show()
+void Sml::dump()
 {
-    if (mRoot) {
-        mRoot->showobj( (u8) 0 );
-        delete mRoot;
-        mRoot = nullptr;
+    if (mObjCnt) {
+    	printf( "%d objects:\n", mObjCnt );
+        objDump( 0, 0 );
+        mObjCnt = 0;
     }
 }
 
-SmlObj::SmlObj()  // constructor for root only
-      : mVal(),
-        mType( Type::List ),
-        mSize( 0 ),
-        mCount( 0 ),
-        mNext( nullptr ),
-        mParent( nullptr )
+idx Sml::newObj( u8 byte, idx parent )  // object constructor
 {
+	if (mObjCnt >= (cMaxNofObj - 1))
+		return( 0 );
+
+	const idx ret = mObjCnt++;
+	SmlObj  * p   = obj(ret);
+
+	if (((byte & Byte::TypeMask) != Type::List) &&
+	     (byte & Byte::SizeMask))
+	    --byte;
+
+	p->mParent   = parent;
+	p->mNext	   = 0;
+	p->mTypeSize = byte;
+	p->mVal 	   = 0;
+
+	if (((p->mTypeSize & Byte::TypeMask) != Type::List) &&
+		((p->mTypeSize & Byte::SizeMask) > 1))
+	{
+		if (! (p->mVal = newData( p->mTypeSize & Byte::SizeMask )))
+			return( 0 );
+	}
+
+	return( ret );
 }
 
-SmlObj::SmlObj( u8 byte, SmlObj * parent )  // constructor for all other
-      : mVal(),
-        mType( (Type) (byte & (u8) Byte::TypeMask) ),
-        mSize(         byte & (u8) Byte::SizeMask ),
-        mCount( 0 ),
-        mNext( nullptr ),
-        mParent( parent )
+idx Sml::newData( u8 size )
 {
-    if (mSize && (mType != Type::List))
-        --mSize;
+	const u8 nofObjs = (size + sizeof(SmlObj) - 1) / sizeof(SmlObj);
 
-    switch (mType)
-    {
-        case Type::ByteStr:
-            if (mSize)
-                mVal.byteStr = new u8[mSize];
-            break;
-/*
-        case Type::Invalid1:
-        case Type::Invalid2:
-        case Type::Invalid3:
-            throw std::runtime_error("invalid type");
-*/
-        default:
-            break;
-    }
+	if (mObjCnt >= (cMaxNofObj - nofObjs))
+		return( 0 );
+	const idx ret = mObjCnt;
+	mObjCnt += nofObjs;
+	return( ret );
 }
 
-SmlObj::~SmlObj()
+idx Sml::objParse( u8 byte )
 {
-    switch ((u8) mType)
-    {
-        case (u8) Type::ByteStr:
-            if (mSize)
-                delete[] mVal.byteStr;
-            break;
-
-        case (u8) Type::List:
-            SmlObj * obj = mVal.list;
-            mVal.list = nullptr;
-            while (obj) {
-                SmlObj * next = obj->mNext;
-                delete obj;
-                obj = next;
-            }
-            break;
-    }
-}
-
-SmlObj * SmlObj::parse( u8 byte, Sml & sml )
-{
-    switch (mType)
+	SmlObj * p = obj(mParsing);
+    switch (p->mTypeSize & Byte::TypeMask)
     {
         case Type::List:
-            if (byte == (u8) Byte::MsgEnd)
+            if (byte == Byte::MsgEnd)
                 break;
-            if (byte == (u8) Byte::Escape)
-                return nullptr;
-            if ((sTypeInvalid >> (byte >> (u8) Byte::TypeShift)) & 1) {
-                sml.abort();
-                return nullptr;
-            }
-            /*
-            switch (byte)
+            if (byte == Byte::Escape)
+                return( 0 );
+            if ((sTypeInvalid >> (byte >> Byte::TypeShift)) & 1)
+                return( abort( Err::InvalidType ) );
+
             {
-                case (u8) Type::Invalid1:
-                case (u8) Type::Invalid2:
-                case (u8) Type::Invalid3:
-                    throw std::runtime_error("invalid type byte");
-            }
-            */
-            {
-                SmlObj ** link = & mVal.list;
-                while (*link) link = & (*link)->mNext;
-                *link = new SmlObj( byte, this );
-                if ((*link)->mSize)
-                    return *link;
+                idx * link = & p->mVal;
+                while (*link) link = & obj(*link)->mNext;
+                idx i = *link = newObj( byte, mParsing );
+                if (! i)
+                	return( abort( Err::OutOfMemory ) );
+
+                if (((byte & Byte::TypeMask) == Type::List) ||
+                	(obj(i)->mTypeSize & Byte::SizeMask)) {
+                	for (u8 depth = cMaxListDepth - 1; depth; --depth)
+                		mElemCnt[depth] = mElemCnt[depth - 1];
+                	mElemCnt[0] = mByteCnt;
+                	mByteCnt = 0;
+                    return( *link );
+                }
                 // else: 01 -> zero length byte string -> elem. done
             }
             break;
 
         case Type::ByteStr:
-            mVal.byteStr[mCount] = byte;
+        	if ((p->mTypeSize & Byte::SizeMask) > 1)
+            	bytes(p->mVal)[mByteCnt] = byte;
+        	else
+            	p->mVal = byte;
             break;
 
         default:
-            mVal._u64 <<= 8;
-            mVal._u64 |= byte;
+        	if ((p->mTypeSize & Byte::SizeMask) > 1)
+        		*uns64(p->mVal) = (*uns64(p->mVal) << 8) | byte;
+        	else
+        		p->mVal = byte;
             break;
     }
 
-    SmlObj * ret = this;
+    idx ret = mParsing;
     while (ret) {
-        if (++ret->mCount < ret->mSize)
+        if (++mByteCnt < (obj(ret)->mTypeSize & Byte::SizeMask))
             break;
-        if (! ret->mSize)
+        if (! (obj(ret)->mTypeSize & Byte::SizeMask))
             break;
-        ret = ret->mParent;  // just lists can be parents --> ret is a list
+        ret = obj(ret)->mParent;  // just lists can be parents --> ret is a list
+        mByteCnt = mElemCnt[0];
+        for (u8 depth = 0; depth < (cMaxListDepth - 1); ++depth)
+        	mElemCnt[depth] = mElemCnt[depth + 1];
     }
     return ret;
 }
 
-void SmlObj::showobj( u8 indent )
+void Sml::objDump( idx o, u8 indent )
 {
-    printf( "%*s%c%d-%02x: ", indent * 4, "",
-                sTypechar[(u8) mType >> (u8) Byte::TypeShift],
-                mSize * ((((sTypeInt >> ((u8) mType >> (u8) Byte::TypeShift)) & 1) * 7) + 1),
-                (u8) mType | (mSize + ((sTypePlus1 >> ((u8) mType >> (u8) Byte::TypeShift)) & 1)) );
-    u8 i;
-    SmlObj * elem;
+	SmlObj * const p = obj(o);
+	u8       const size = p->mTypeSize & Byte::SizeMask;
+	u8       const type = p->mTypeSize & Byte::TypeMask;
 
-    switch (mType)
+	printf( "%*s%c%d-%02x: ", indent * 4, "",
+                sTypechar[type >> Byte::TypeShift],
+                size * ((((sTypeInt >> (type >> Byte::TypeShift)) & 1) * 7) + 1),
+				p->mTypeSize + ((sTypePlus1 >> (type >> Byte::TypeShift)) & 1) );
+    u8 	 i;
+    idx  elem;
+    u8 * byteStr;
+
+    switch (p->mTypeSize & Byte::TypeMask)
     {
         case Type::ByteStr:
-            for (i = 0; i < mSize; ++i)
-                printf( "%02x ", mVal.byteStr[i] );
+        	if (size > 1)
+        		byteStr = bytes(p->mVal);
+        	else
+        		byteStr = & p->mVal;
+
+        	for (i = 0; i < size; ++i)
+                printf( "%02x ", byteStr[i] );
             fputs( "\"", stdout );
-            for (i = 0; i < mSize; ++i)
-                if ((mVal.byteStr[i] >= 0x20) && (mVal.byteStr[i] < 0x7f))
-                    putchar( mVal.byteStr[i] );
+            for (i = 0; i < size; ++i)
+                if ((byteStr[i] >= 0x20) && (byteStr[i] < 0x7f))
+                    putchar( byteStr[i] );
                 else
                     putchar( '.' );
             puts( "\"" );
@@ -301,49 +310,43 @@ void SmlObj::showobj( u8 indent )
             // puts( "list of %d elements", mSize );
             puts( "" );
             i = 0;
-            for (elem = mVal.list; elem; elem = elem->mNext) {
-                printf( "%*s %d/%d:\n", indent * 4, "", ++i, mSize );
-                elem->showobj( indent + 1 );
+            for (elem = p->mVal; elem; elem = obj(elem)->mNext) {
+                printf( "%*s %d/%d:\n", indent * 4, "", ++i, size );
+                objDump( elem, indent + 1 );
             }
             break;
 
         case Type::Boolean:
-            printf( "%d = %s\n", mVal._i8, mVal._i8 ? "true" : "false" );
+            printf( "%d = %s\n", p->mVal, p->mVal ? "true" : "false" );
             break;
 
         case Type::Integer:
-            switch (mSize)
+            switch (size)
             {
                 case 0:
-                case 1:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u8,
-                                                                     mVal._i8  ); break;
-                case 2:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u16,
-                                                                     mVal._i16 ); break;
+                case 1:  printf( "0x%0*x"   " = %d"   "\n", size*2, p->mVal, p->mVal ); break;
+                case 2:  printf( "0x%0*x"   " = %d"   "\n", size*2, *uns16( p->mVal ),
+                                                                    *int16( p->mVal ) ); break;
                 case 3:
-                case 4:  printf( "0x%0*lx"  " = %ld"  "\n", mSize*2,
-                                                     (unsigned long) mVal._u32,
-                                                              (long) mVal._i32 ); break;
-                default: printf( "0x%0*llx" " = %lld" "\n", mSize*2,
-                                                (unsigned long long) mVal._u64,
-                                                         (long long) mVal._i64 ); break;
+                case 4:  printf( "0x%0*lx"  " = %ld"  "\n", size*2, *uns32( p->mVal ),
+                                                              	  	*int32( p->mVal ) ); break;
+                default: printf( "0x%0*llx" " = %lld" "\n", size*2, *uns64( p->mVal ),
+                                                         	 	 	*int64( p->mVal ) ); break;
             }
             break;
 
         case Type::Unsigned:
-            switch (mSize)
+            switch (size)
             {
                 case 0:
-                case 1:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u8,
-                                                                     mVal._u8  ); break;
-                case 2:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u16,
-                                                                     mVal._u16 ); break;
-                case 3:
-                case 4:  printf( "0x%0*lx"  " = %lu"  "\n", mSize*2,
-                                                     (unsigned long) mVal._u32,
-                                                     (unsigned long) mVal._i32 ); break;
-                default: printf( "0x%0*llx" " = %llu" "\n", mSize*2,
-                                                (unsigned long long) mVal._u64,
-                                                (unsigned long long) mVal._i64 ); break;
+                case 1:  printf( "0x%0*x"   " = %u"   "\n", size*2, p->mVal, p->mVal ); break;
+				case 2:  printf( "0x%0*x"   " = %u"   "\n", size*2, *uns16( p->mVal ),
+																	*uns16( p->mVal ) ); break;
+				case 3:
+				case 4:  printf( "0x%0*lx"  " = %lu"  "\n", size*2, *uns32( p->mVal ),
+																	*uns32( p->mVal ) ); break;
+				default: printf( "0x%0*llx" " = %llu" "\n", size*2, *uns64( p->mVal ),
+																	*uns64( p->mVal ) ); break;
             }
             break;
 
