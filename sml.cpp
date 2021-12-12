@@ -130,7 +130,7 @@ void Sml::start()
     mRoot = new SmlObj{};
     mParsing = mRoot;
     mOffset = 7;
-    
+
     mCrc.init();
     mCrc.add( (u8) Byte::Escape );
     mCrc.add( (u8) Byte::Escape );
@@ -288,13 +288,13 @@ void SmlObj::showobj( u8 indent )
         case Type::ByteStr:
             for (i = 0; i < mSize; ++i)
                 printf( "%02x ", mVal.byteStr[i] );
-            fputs( "(\"", stdout );
+            fputs( "\"", stdout );
             for (i = 0; i < mSize; ++i)
                 if ((mVal.byteStr[i] >= 0x20) && (mVal.byteStr[i] < 0x7f))
                     putchar( mVal.byteStr[i] );
                 else
                     putchar( '.' );
-            puts( "\")" );
+            puts( "\"" );
             break;
 
         case Type::List:
@@ -307,12 +307,18 @@ void SmlObj::showobj( u8 indent )
             }
             break;
 
-        case Type::Boolean: printf( "%s\n", mVal._u8 ? "true" : "false" ); break;
+        case Type::Boolean:
+            printf( "%d = %s\n", mVal._i8, mVal._i8 ? "true" : "false" );
+            break;
+
         case Type::Integer:
-            switch (mSize) {
+            switch (mSize)
+            {
                 case 0:
-                case 1:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u8,  mVal._i8  ); break;
-                case 2:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u16, mVal._i16 ); break;
+                case 1:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u8,
+                                                                     mVal._i8  ); break;
+                case 2:  printf( "0x%0*x"   " = %d"   "\n", mSize*2, mVal._u16,
+                                                                     mVal._i16 ); break;
                 case 3:
                 case 4:  printf( "0x%0*lx"  " = %ld"  "\n", mSize*2,
                                                      (unsigned long) mVal._u32,
@@ -322,11 +328,15 @@ void SmlObj::showobj( u8 indent )
                                                          (long long) mVal._i64 ); break;
             }
             break;
+
         case Type::Unsigned:
-            switch (mSize) {
+            switch (mSize)
+            {
                 case 0:
-                case 1:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u8,  mVal._u8  ); break;
-                case 2:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u16, mVal._u16 ); break;
+                case 1:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u8,
+                                                                     mVal._u8  ); break;
+                case 2:  printf( "0x%0*x"   " = %u"   "\n", mSize*2, mVal._u16,
+                                                                     mVal._u16 ); break;
                 case 3:
                 case 4:  printf( "0x%0*lx"  " = %lu"  "\n", mSize*2,
                                                      (unsigned long) mVal._u32,
@@ -336,8 +346,9 @@ void SmlObj::showobj( u8 indent )
                                                 (unsigned long long) mVal._i64 ); break;
             }
             break;
+
         default:
-            printf(   "unknown type %x"    "\n", (u8) mType  );
+            puts( "?" );
             break;
     }
 }
