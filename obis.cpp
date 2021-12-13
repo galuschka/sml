@@ -225,8 +225,11 @@ void SmlObis::obis()
         {
             Obj objMsgId { objBody, 0 };  //
             msgId = objMsgId.getU32( typematch );
-            if (!typematch)
-                break;
+            if (!typematch) {
+                msgId = objMsgId.getU16( typematch );
+                if (!typematch)
+                    break;
+            }
         }
 
         switch (msgId)
