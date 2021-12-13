@@ -29,6 +29,13 @@ class SmlObis : public Sml
             ActionCosemResponse = 0x00000A01,
             AttentionResponse = 0x0000FF01,
         };
+        struct MeasId
+        {
+                u8 id[3];
+                const char *en;
+                const char *de;
+        };
+
         void onReady( u8 err, u8 byte )
         {
             switch (err)
@@ -113,7 +120,23 @@ class SmlObis : public Sml
         void printObj( const char * prefix, const Obj & obj );
 
         void obis();
+
+        static const MeasId IdTab[];
 };
+
+const SmlObis::MeasId SmlObis::IdTab[] = {
+// @fmt:off
+        { {  96,  50,   1 }, "Manufacturer ID", "Herstellerkennung" },
+        { {  96,   1,   0 }, "Device ID",       "Geräteidentifikation" },
+        { {   0,   2,   0 }, "Firmware version","Firmware-Version" },
+        { {   1,   8, 255 }, "Work purchase",   "Arbeit Bezug" },
+        { {   2,   8, 255 }, "Work feed-in",    "Arbeit Einspeisung" },
+        { {  16,   7, 255 }, "Current power",   "Momentane Wirkleistung" },
+        { { 255, 255,   0 }, "No tariff",       "tariflos" },
+        { { 255, 255,   1 }, "Tariff 1",        "Tarif 1" },
+        { { 255, 255,   2 }, "Tariff 2",        "Tarif 2" },
+};
+// @fmt:on
 
 void SmlObis::printObj( const char * prefix, const Obj & obj )
 {
@@ -198,7 +221,7 @@ void SmlObis::obis()
 {
     u32 msgId = 0;
 
-    puts( "{" );
+    fputs( "{ ", stdout );
 
     for (u8 lvl0idx = 0; msgId != CloseResponse; ++lvl0idx) {
         /*
@@ -248,7 +271,7 @@ void SmlObis::obis()
                  */
                 Obj objOpenres { objBody, 1 };
                 Obj objDeviceID { objOpenres, 3 };
-                printObj( "\"ID\" : ", objDeviceID );
+                printObj( "\"ID\"     : ", objDeviceID );
             }
                 break;
 
@@ -290,7 +313,7 @@ void SmlObis::obis()
                  */
                 Obj objListRes { objBody, 1 };
                 Obj objValList { objListRes, 4 };
-                const char *sep = ",\n\"values\": [\n";
+                const char *sep = ",\n  \"values\" : [\n";
                 const char *close = "";
 
                 for (u8 validx = 0; validx < objValList.size(); ++validx) {
@@ -301,39 +324,92 @@ void SmlObis::obis()
                         if (len < 6)
                             continue;
 
-                        printf( "%s { \"measId\" : \"%d-%d:%d.%d.%d*%d\"", sep,
+                        printf( "%s  { \"idnum\" : \"%d-%d:%d.%d.%d*%d\"", sep,
                                 measId[0], measId[1], measId[2], measId[3],
                                 measId[4], measId[5] );
                         sep = ",\n";
                         close = " ]";
-                    }
-                    // if (id[0] == 1)   // Strom
-                    //      if (id[2] == 1)   // Bezug
-                    //      if (id[2] == 2)   // Einspeisung
 
+                        bool known = false;
+                        for (u8 eIdx = 0;
+                                eIdx < (sizeof(IdTab) / sizeof(IdTab[0]));
+                                ++eIdx) {
+                            MeasId const &eRef = IdTab[eIdx];
+                            bool match = true;
+                            bool exact = true;
+                            for (u8 j = 0; j < 3; ++j)
+                                if (eRef.id[j] == 0xff)
+                                    exact = false;
+                                else if (measId[2 + j] != eRef.id[j])
+                                    match = false;
+                            if (match
+                                    && (exact || known || (eRef.id[0] != 0xff))) {
+                                if (!known)
+                                    fputs( ",\n    \"descr\" : \"", stdout );
+                                else
+                                    fputs( " - ", stdout );
+                                known = true;
+                                fputs( eRef.en, stdout );
+                            }
+                            if (match && exact)
+                                break;
+                        }
+                        if (known)
+                            putchar( '"' );
+#if 1
+                        Obj objUnit { objElem, 3 };
+                        Obj objScaler { objElem, 4 };
+                        Obj objValue { objElem, 5 };
+
+                        known = false;
+
+                        u8 unit = objUnit.getU8( typematch );
+                        if (((measId[2] == 1) || (measId[2] == 2))
+                                && (measId[3] == 8) && typematch
+                                && (unit == 30)) {
+                            u32 value = objValue.getU32( typematch );
+                            if (!typematch)
+                                value = objValue.getU16( typematch );
+                            if (!typematch)
+                                value = objValue.getU8( typematch );
+                            if (typematch) {
+                                i8 scale = 3 - objScaler.getI8( typematch );
+                                if (typematch && (scale >= 0)) {
+                                    known = true;
+                                    fputs( ",\n    \"value\" : ", stdout );
+                                    if (scale) {
+                                        double x = value;
+                                        for (u8 s = 0; s < scale; ++s)
+                                            x /= 10.0;
+                                        printf( "%.*f", scale, x );
+                                    } else
+                                        printf( "%d", value );
+                                    fputs( ",\n    \"unit\"  : \"kWh\"",
+                                    stdout );
+                                }
+                            }
+                        }
+
+                        if (!known) {
+                            printObj( ",\n    \"value\" : ", objValue );
+                            printOptional( ",\n    \"scale\" : ", objScaler );
+                            printOptional( ",\n    \"unit\"  : ", objUnit );
+                        }
+#else
+                    }
                     {
                         Obj objValue { objElem, 5 };
-                        printObj( ",\n   \"value\"  : ", objValue );
+                        printObj( ",\n    \"value\" : ", objValue );
                     }
                     {
                         Obj objScaler { objElem, 4 };
-                        printOptional( ",\n   \"scaler\" : ", objScaler );
+                        printOptional( ",\n    \"scale\" : ", objScaler );
                     }
                     {
                         Obj objUnit { objElem, 3 };
-                        printOptional( ",\n   \"unit\"   : ", objUnit );
+                        printOptional( ",\n    \"unit\"  : ", objUnit );
+#endif
                     }
-                    /*
-                     * 1-0:1.8.0   Summe Zählerstände Tarife T1 + T2 (in kWh)
-                     * 1-0:1.8.1   Zählerstand Verbrauch Hochtarif T1 (in kWh)
-                     * 1-0:2.8.1   Zählerstand Einspeisung (in kWh) z. B. nicht selbst verbrauchter Solarstrom
-                     * 1-0:1.8.2   Zählerstand Verbrauch Niedertarif T2 (in kWh)
-                     * 1-1:1.29.0  Viertelstundenwert Lastgang Wirkarbeit
-                     * 1-0:16.7.0  Momentane Leistung (in W)
-                     * 1-0:36.7.0  Momentane Leistung Phase L1 (in W)
-                     * 1-0:56.7.0  Momentane Leistung Phase L2 (in W)
-                     * 1-0:76.7.0  Momentane Leistung Phase L3 (in W)
-                     */
                     fputs( " }", stdout );
                 }  // for validx
                 puts( close );
