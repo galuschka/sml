@@ -410,6 +410,10 @@ void SmlObis::obis()
                         printOptional( ",\n    \"unit\"  : ", objUnit );
 #endif
                     }
+                    {
+                        Obj objTime { objElem, 2 };
+                        printOptional( ",\n    \"time\"  : ", objTime );
+                    }
                     fputs( " }", stdout );
                 }  // for validx
                 puts( close );
