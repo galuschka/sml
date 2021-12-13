@@ -174,19 +174,19 @@ idx Sml::newObj( u8 byte, idx parent )  // object constructor
         return (0);
 
     const idx ret = mObjCnt++;
-    SmlObj *p = obj( ret );
+    ObjDef &p = intObjDef( ret );
 
     if (((byte & Byte::TypeMask) != Type::List) && (byte & Byte::SizeMask))
         --byte;
 
-    p->mParent = parent;
-    p->mNext = 0;
-    p->mTypeSize = byte;
-    p->mVal = 0;
+    p.mParent = parent;
+    p.mNext = 0;
+    p.mTypeSize = byte;
+    p.mVal = 0;
 
-    if (((p->mTypeSize & Byte::TypeMask) != Type::List)
-            && ((p->mTypeSize & Byte::SizeMask) > 1)) {
-        if (!(p->mVal = newData( p->mTypeSize & Byte::SizeMask )))
+    if (((p.mTypeSize & Byte::TypeMask) != Type::List)
+            && ((p.mTypeSize & Byte::SizeMask) > 1)) {
+        if (!(p.mVal = newData( p.mTypeSize & Byte::SizeMask )))
             return (0);
     }
 
@@ -213,20 +213,20 @@ idx Sml::newData( u8 size )
         default:
             break;
     }
-    const u8 nofObjs = (effsize + sizeof(SmlObj) - 1) / sizeof(SmlObj);
+    const u8 nofObjs = (effsize + sizeof(ObjDef) - 1) / sizeof(ObjDef);
 
     if (mObjCnt >= (cMaxNofObj - nofObjs))
         return (0);
     const idx ret = mObjCnt;
     mObjCnt += nofObjs;
-    memset( bytes( ret ), 0, effsize );
+    memset( intBytes( ret ), 0, effsize );
     return (ret);
 }
 
 idx Sml::objParse( u8 byte )
 {
-    SmlObj *p = obj( mParsing );
-    switch (p->mTypeSize & Byte::TypeMask)
+    ObjDef &p = intObjDef( mParsing );
+    switch (p.mTypeSize & Byte::TypeMask)
     {
         case Type::List:
             if (byte == Byte::MsgEnd)
@@ -239,15 +239,15 @@ idx Sml::objParse( u8 byte )
                 return (abort( Err::InvalidType ));
 
             {
-                idx *link = &p->mVal;
+                idx *link = &p.mVal;
                 while (*link)
-                    link = &obj( *link )->mNext;
+                    link = &intObjDef( *link ).mNext;
                 idx i = *link = newObj( byte, mParsing );
                 if (!i)
                     return (abort( Err::OutOfMemory ));
 
                 if (((byte & Byte::TypeMask) == Type::List)
-                        || (obj( i )->mTypeSize & Byte::SizeMask)) {
+                        || (intObjDef( i ).mTypeSize & Byte::SizeMask)) {
                     for (u8 depth = cMaxListDepth - 1; depth; --depth)
                         mElemCnt[depth] = mElemCnt[depth - 1];
                     mElemCnt[0] = mByteCnt;
@@ -259,28 +259,28 @@ idx Sml::objParse( u8 byte )
             break;
 
         case Type::ByteStr:
-            if ((p->mTypeSize & Byte::SizeMask) > 1)
-                bytes( p->mVal )[mByteCnt] = byte;
+            if ((p.mTypeSize & Byte::SizeMask) > 1)
+                intBytes( p.mVal )[mByteCnt] = byte;
             else
-                p->mVal = byte;
+                p.mVal = byte;
             break;
 
         default:
-            switch (p->mTypeSize & Byte::SizeMask)
+            switch (p.mTypeSize & Byte::SizeMask)
             {
                 case 0:
                 case 1:
-                    p->mVal = byte;
+                    p.mVal = byte;
                     break;
                 case 2:
-                    *uns16( p->mVal ) = (*uns16( p->mVal ) << 8) | byte;
+                    *intU16( p.mVal ) = (*intU16( p.mVal ) << 8) | byte;
                     break;
                 case 3:
                 case 4:
-                    *uns32( p->mVal ) = (*uns32( p->mVal ) << 8) | byte;
+                    *intU32( p.mVal ) = (*intU32( p.mVal ) << 8) | byte;
                     break;
                 default:
-                    *uns64( p->mVal ) = (*uns64( p->mVal ) << 8) | byte;
+                    *intU64( p.mVal ) = (*intU64( p.mVal ) << 8) | byte;
                     break;
             }
             break;
@@ -288,11 +288,11 @@ idx Sml::objParse( u8 byte )
 
     idx ret = mParsing;
     while (ret) {
-        if (++mByteCnt < (obj( ret )->mTypeSize & Byte::SizeMask))
+        if (++mByteCnt < (intObjDef( ret ).mTypeSize & Byte::SizeMask))
             break;
-        if (!(obj( ret )->mTypeSize & Byte::SizeMask))
+        if (!(intObjDef( ret ).mTypeSize & Byte::SizeMask))
             break;
-        ret = obj( ret )->mParent;  // just lists can be parents --> ret is a list
+        ret = intObjDef( ret ).mParent;  // just lists can be parents --> ret is a list
         mByteCnt = mElemCnt[0];
         for (u8 depth = 0; depth < (cMaxListDepth - 1); ++depth)
             mElemCnt[depth] = mElemCnt[depth + 1];
@@ -302,25 +302,25 @@ idx Sml::objParse( u8 byte )
 
 void Sml::objDump( idx o, u8 indent )
 {
-    SmlObj *const p = obj( o );
-    u8 const size = p->mTypeSize & Byte::SizeMask;
-    u8 const type = p->mTypeSize & Byte::TypeMask;
+    ObjDef &p = intObjDef( o );
+    u8 const size = p.mTypeSize & Byte::SizeMask;
+    u8 const type = p.mTypeSize & Byte::TypeMask;
 
     printf( "%*s%c%d-%02x: ", indent * 4, "",
             sTypechar[type >> Byte::TypeShift],
             size * ((((sTypeInt >> (type >> Byte::TypeShift)) & 1) * 7) + 1),
-            p->mTypeSize + ((sTypePlus1 >> (type >> Byte::TypeShift)) & 1) );
+            p.mTypeSize + ((sTypePlus1 >> (type >> Byte::TypeShift)) & 1) );
     u8 i;
     idx elem;
     u8 *byteStr;
 
-    switch (p->mTypeSize & Byte::TypeMask)
+    switch (p.mTypeSize & Byte::TypeMask)
     {
         case Type::ByteStr:
             if (size > 1)
-                byteStr = bytes( p->mVal );
+                byteStr = intBytes( p.mVal );
             else
-                byteStr = &p->mVal;
+                byteStr = &p.mVal;
 
             for (i = 0; i < size; ++i)
                 printf( "%02x ", byteStr[i] );
@@ -337,14 +337,14 @@ void Sml::objDump( idx o, u8 indent )
             // puts( "list of %d elements", mSize );
             puts( "" );
             i = 0;
-            for (elem = p->mVal; elem; elem = obj( elem )->mNext) {
+            for (elem = p.mVal; elem; elem = intObjDef( elem ).mNext) {
                 printf( "%*s %d/%d:\n", indent * 4, "", ++i, size );
                 objDump( elem, indent + 1 );
             }
             break;
 
         case Type::Boolean:
-            printf( "%d = %s\n", p->mVal, p->mVal ? "true" : "false" );
+            printf( "%d = %s\n", p.mVal, p.mVal ? "true" : "false" );
             break;
 
         case Type::Integer:
@@ -352,20 +352,20 @@ void Sml::objDump( idx o, u8 indent )
             {
                 case 0:
                 case 1:
-                    printf( "0x%0*x = %d\n", size * 2, p->mVal, (i8) p->mVal );
+                    printf( "0x%0*x = %d\n", size * 2, p.mVal, (i8) p.mVal );
                     break;
                 case 2:
-                    printf( "0x%0*x = %d\n", size * 2, *uns16( p->mVal ),
-                            *int16( p->mVal ) );
+                    printf( "0x%0*x = %d\n", size * 2, *intU16( p.mVal ),
+                            *intI16( p.mVal ) );
                     break;
                 case 3:
                 case 4:
-                    printf( "0x%0*x = %d\n", size * 2, *uns32( p->mVal ),
-                            *int32( p->mVal ) );
+                    printf( "0x%0*x = %d\n", size * 2, *intU32( p.mVal ),
+                            *intI32( p.mVal ) );
                     break;
                 default:
-                    printf( "0x%0*lx = %ld\n", size * 2, *uns64( p->mVal ),
-                            *int64( p->mVal ) );
+                    printf( "0x%0*lx = %ld\n", size * 2, *intU64( p.mVal ),
+                            *intI64( p.mVal ) );
                     break;
             }
             break;
@@ -375,20 +375,20 @@ void Sml::objDump( idx o, u8 indent )
             {
                 case 0:
                 case 1:
-                    printf( "0x%0*x = %u\n", size * 2, p->mVal, p->mVal );
+                    printf( "0x%0*x = %u\n", size * 2, p.mVal, p.mVal );
                     break;
                 case 2:
-                    printf( "0x%0*x = %u\n", size * 2, *uns16( p->mVal ),
-                            *uns16( p->mVal ) );
+                    printf( "0x%0*x = %u\n", size * 2, *intU16( p.mVal ),
+                            *intU16( p.mVal ) );
                     break;
                 case 3:
                 case 4:
-                    printf( "0x%0*x = %u\n", size * 2, *uns32( p->mVal ),
-                            *uns32( p->mVal ) );
+                    printf( "0x%0*x = %u\n", size * 2, *intU32( p.mVal ),
+                            *intU32( p.mVal ) );
                     break;
                 default:
-                    printf( "0x%0*lx = %lu\n", size * 2, *uns64( p->mVal ),
-                            *uns64( p->mVal ) );
+                    printf( "0x%0*lx = %lu\n", size * 2, *intU64( p.mVal ),
+                            *intU64( p.mVal ) );
                     break;
             }
             break;

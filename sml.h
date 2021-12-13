@@ -62,7 +62,7 @@ enum Err
 
 class Sml;
 
-class SmlObj
+class ObjDef
 {
     public:
         idx mParent;   // parent list (the list containing this)
@@ -88,32 +88,48 @@ class Sml
         idx newData( u8 size );
 
         // @fmt:off
-        SmlObj* obj( idx i ) { return (&mObj[i]); }
+        const ObjDef& extObjDef( idx i ) const { return (mObjDef[i]); }
 
-        u8*  bytes( idx i ) { return (reinterpret_cast<u8*>( &mObj[i] )); }
-        u16* uns16( idx i ) { return (reinterpret_cast<u16*>( &mObj[i] )); }
-        u32* uns32( idx i ) { return (reinterpret_cast<u32*>( &mObj[i] )); }
-        u64* uns64( idx i ) { return (reinterpret_cast<u64*>( &mObj[i] )); }
-        i16* int16( idx i ) { return (reinterpret_cast<i16*>( &mObj[i] )); }
-        i32* int32( idx i ) { return (reinterpret_cast<i32*>( &mObj[i] )); }
-        i64* int64( idx i ) { return (reinterpret_cast<i64*>( &mObj[i] )); }
-                // @fmt:on
+        u8 const* extBytes( idx i ) const { return (reinterpret_cast<u8 const *>( &mObjDef[i] )); }
+        u16 extU16( idx i ) const { return (*reinterpret_cast<u16 const *>( &mObjDef[i] )); }
+        u32 extU32( idx i ) const { return (*reinterpret_cast<u32 const *>( &mObjDef[i] )); }
+        u64 extU64( idx i ) const { return (*reinterpret_cast<u64 const *>( &mObjDef[i] )); }
+        i16 extI16( idx i ) const { return (*reinterpret_cast<i16 const *>( &mObjDef[i] )); }
+        i32 extI32( idx i ) const { return (*reinterpret_cast<i32 const *>( &mObjDef[i] )); }
+        i64 extI64( idx i ) const { return (*reinterpret_cast<i64 const *>( &mObjDef[i] )); }
+                                                                                                                                                                                                                                                                                                                // @fmt:on
 
+        u8 objCnt() const
+        {
+            return mObjCnt;
+        }
     private:
+        // @fmt:off
+        ObjDef& intObjDef( idx i ) { return (mObjDef[i]); }
+
+        u8*  intBytes( idx i ) { return (reinterpret_cast<u8 *>( &mObjDef[i] )); }
+        u16* intU16( idx i ) { return (reinterpret_cast<u16 *>( &mObjDef[i] )); }
+        u32* intU32( idx i ) { return (reinterpret_cast<u32 *>( &mObjDef[i] )); }
+        u64* intU64( idx i ) { return (reinterpret_cast<u64 *>( &mObjDef[i] )); }
+        i16* intI16( idx i ) { return (reinterpret_cast<i16 *>( &mObjDef[i] )); }
+        i32* intI32( idx i ) { return (reinterpret_cast<i32 *>( &mObjDef[i] )); }
+        i64* intI64( idx i ) { return (reinterpret_cast<i64 *>( &mObjDef[i] )); }
+                                                                                                                                                                                                                                                                                                                // @fmt:on
+
         idx objParse( u8 byte );  // next input byte -> true: complete
 
     protected:
-        u16 mOffset;   // position in frame
-        u16 mCrcRead;  // CRC from input data
-        Crc mCrc;		// updated on each byte received
+        u16 mOffset;    // position in frame
+        u16 mCrcRead;   // CRC from input data
+        Crc mCrc;	    // updated on each byte received
 
     private:
-        u8 mStatus;  // Status
+        u8 mStatus;                   // Status
         u8 mErr;
-        u8 mByteCnt; 	// common byte counter
-        idx mObjCnt;   // next free object index
-        idx mParsing;  // pointer to currently parsed object
-        SmlObj mObj[cMaxNofObj];  // storage of objects
+        u8 mByteCnt;                  // common byte counter
+        idx mObjCnt;                  // next free object index
+        idx mParsing;                 // pointer to currently parsed object
+        ObjDef mObjDef[cMaxNofObj];   // storage of objects
         idx mElemCnt[cMaxListDepth];  // to stack the list elements counters
 
         enum Status
@@ -132,4 +148,171 @@ class Sml
         static const u8 sTypePlus1;
         static const u8 sTypeInt;
         static const u8 sTypeInvalid;
+};
+
+class Obj
+{
+        Obj() = delete;
+    public:
+        ~Obj() = default;
+
+        Obj( Sml & sml, idx start ) :
+                mSml { sml }, mIdx { 0 }  // start-th element of root
+        {
+            mIdx = mSml.extObjDef( 0 ).mVal;
+            while (start--) {
+                mIdx = mSml.extObjDef( mIdx ).mNext;
+                if (mIdx >= mSml.objCnt()) {
+                    mIdx = 0;  // == no such object
+                    break;
+                }
+            }
+        }
+
+        Obj( Obj & obj, idx i ) :
+                mSml { obj.mSml }, mIdx { obj.mIdx }  // i-th element of list
+        {
+            if (!isType( Type::List )) {
+                mIdx = 0;  // == no such object
+                return;
+            }
+            mIdx = mSml.extObjDef( mIdx ).mVal;
+            while (i--) {
+                mIdx = mSml.extObjDef( mIdx ).mNext;
+                if (mIdx >= mSml.objCnt()) {
+                    mIdx = 0;  // == no such object
+                    break;
+                }
+            }
+        }
+
+        const ObjDef& objDef() const
+        {
+            return (mSml.extObjDef( mIdx ));
+        }
+        u8 typesize() const
+        {
+            if (!mIdx || (mIdx >= mSml.objCnt()))
+                return (0);
+            return (objDef().mTypeSize);
+        }
+        u8 type() const
+        {
+            return (typesize() & Byte::TypeMask);
+        }
+        u8 size() const
+        {
+            return (typesize() & Byte::SizeMask);
+        }
+
+        bool isType( u8 t ) const
+        {
+            if (!mIdx || (mIdx >= mSml.objCnt()))
+                return (false);
+            return (type() == (t & Byte::TypeMask));
+        }
+
+        const u8* bytes( u8 & len ) const
+        {
+            if (!isType( Type::ByteStr )) {
+                len = 0;
+                return (nullptr);
+            }
+            len = typesize() & Byte::SizeMask;
+            if (len <= 1)
+                return (&objDef().mVal);
+            return (mSml.extBytes( objDef().mVal ));
+        }
+
+        u8 getU8( bool & typematch ) const
+        {
+            if (typesize() == (Type::Unsigned | 1)) {
+                typematch = true;
+                return (intU8());
+            }
+            typematch = false;
+            return (0xff);
+        }
+        u16 getU16( bool & typematch ) const
+        {
+            if (typesize() == (Type::Unsigned | 2)) {
+                typematch = true;
+                return (intU16());
+            }
+            typematch = false;
+            return (0xffff);
+        }
+        u32 getU32( bool & typematch ) const
+        {
+            if (typesize() == (Type::Unsigned | 4)) {
+                typematch = true;
+                return (intU32());
+            }
+            typematch = false;
+            return (0xffffffff);
+        }
+        u64 getU64( bool & typematch ) const
+        {
+            if (typesize() == (Type::Unsigned | 8)) {
+                typematch = true;
+                return (intU64());
+            }
+            typematch = false;
+            return (0xffffffffffffffff);
+        }
+        i8 getI8( bool & typematch ) const
+        {
+            if (typesize() == (Type::Integer | 1)) {
+                typematch = true;
+                return (intI8());
+            }
+            typematch = false;
+            return (-1);
+        }
+        i16 getI16( bool & typematch ) const
+        {
+            if (typesize() == (Type::Integer | 2)) {
+                typematch = true;
+                return (intI16());
+            }
+            typematch = false;
+            return (-1);
+        }
+        i32 getI32( bool & typematch ) const
+        {
+            if (typesize() == (Type::Integer | 4)) {
+                typematch = true;
+                return (intI32());
+            }
+            typematch = false;
+            return (-1);
+        }
+        i64 getI64( bool & typematch ) const
+        {
+            if (typesize() == (Type::Integer | 8)) {
+                typematch = true;
+                return (intI64());
+            }
+            typematch = false;
+            return (-1);
+        }
+
+    private:
+        // @fmt:off
+        u8 intU8() const { return (objDef().mVal); }
+
+        u16 intU16() const { return (mSml.extU16( objDef().mVal )); }
+        u32 intU32() const { return (mSml.extU32( objDef().mVal )); }
+        u64 intU64() const { return (mSml.extU64( objDef().mVal )); }
+
+        i8  intI8() const { return (objDef().mVal); }
+        i16 intI16() const { return (mSml.extI16( objDef().mVal )); }
+        i32 intI32() const { return (mSml.extI32( objDef().mVal )); }
+        i64 intI64() const { return (mSml.extI64( objDef().mVal )); }
+// @fmt:on
+
+        const Sml &mSml;
+        idx mIdx;
+
+        // friend class Sml;
 };
