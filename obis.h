@@ -101,7 +101,7 @@ enum Unit {
 bool isAscii( u8 byte );
 bool isString( const u8 * bytes, u8 len );
 
-template<typename T> char * mkUString( char * buf, u8 size, T x )
+template<typename T> char * utoa( char * buf, u8 size, T x )
 {
     char * cp = buf + size - 1;
     *cp = 0; // terminator
@@ -119,7 +119,7 @@ template<typename T> char * mkUString( char * buf, u8 size, T x )
     return (cp);
 }
 
-template<typename T> char * mkIString( char * buf, u8 size, T x )
+template<typename T> char * itoa( char * buf, u8 size, T x )
 {
     typedef typename std::make_unsigned<T>::type unsignedT;
 

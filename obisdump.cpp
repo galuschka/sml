@@ -262,38 +262,53 @@ void SmlObis::obis()
                         Obj objValue { objElem, Obis::ListEntry::Value };
 
                         known = false;
+                        do {  // while(false) - avoid goto
+                            if ((measId[3] != 8) || (((measId[2] != 1) && (measId[2] != 2))))
+                                break;
 
-                        u8 unit = objUnit.getU8( typematch );
-                        if (((measId[2] == 1) || (measId[2] == 2)) && (measId[3] == 8) && typematch
-                                && (unit == Obis::ListEntry::Unit::Wh)) {
+                            u8 unit = objUnit.getU8( typematch );
+                            if (!typematch || (unit != Obis::ListEntry::Unit::Wh))
+                                break;
+
+                            i8 precision = 3 - objScaler.getI8( typematch );  // precision of kWh
+                            if (!typematch || (precision < 0))
+                                break;
+
+                            if (!precision) {
+                                printObj( ",\n    \"value\" : ", objValue );
+                                fputs( ",\n    \"unit\"  : \"kWh\"", stdout );
+                                known = true;
+                                break;
+                            }
+
                             u32 value = objValue.getU32( typematch );
-                            if (!typematch)
+                            if (!typematch) {
                                 value = objValue.getU16( typematch );
-                            if (!typematch)
-                                value = objValue.getU8( typematch );
-                            if (typematch) {
-                                i8 scale = 3 - objScaler.getI8( typematch );
-                                if (typematch && (scale >= 0)) {
-                                    known = true;
-                                    fputs( ",\n    \"value\" : ", stdout );
-                                    if (scale) {
-                                        char buf[12];
-                                        char *cp = Obis::mkUString( buf + 1, sizeof(buf) - 1,
-                                                                    value );
-                                        char *point = buf + sizeof(buf) - 2 - scale;
-                                        while (cp > point)
-                                            *--cp = '0';
-                                        for (char *bp = --cp; bp < point; ++bp)
-                                            bp[0] = bp[1];
-                                        *point = '.';
-                                        printf( "%s", cp );
-                                    } else
-                                        printf( "%d", value );
-                                    fputs( ",\n    \"unit\"  : \"kWh\"",
-                                    stdout );
+                                if (!typematch) {
+                                    value = objValue.getU8( typematch );
+                                    if (!typematch)
+                                        break;
                                 }
                             }
-                        }
+
+                            char buf[12];
+                            char *cp = Obis::utoa( buf + 1, sizeof(buf) - 1, value );
+                            if (*cp == '#')
+                                break;
+
+                            char *point = buf + sizeof(buf) - 2 - precision;
+                            while (cp > point)
+                                *--cp = '0';    //      00xyz
+                            for (char *bp = --cp; bp < point; ++bp)
+                                bp[0] = bp[1];  // move integer part digits one ahead
+                            *point = '.';       // rstuv.wxyz
+
+                            fputs( ",\n    \"value\" : ", stdout );
+                            fputs( cp, stdout );
+                            fputs( ",\n    \"unit\"  : \"kWh\"", stdout );
+                            known = true;
+
+                        } while (false);
 
                         if (!known) {
                             printObj( ",\n    \"value\" : ", objValue );
