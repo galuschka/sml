@@ -78,16 +78,11 @@ class Sml
         virtual ~Sml() = 0;
 
         void parse( u8 byte );  // parse next input byte
-        void start();           // start parsing objects (behind esc begin)
         void dump();            // dump the struct
-        idx abort( u8 err );    // set to abort parsing (on type error)
 
         virtual void onReady( u8 err, u8 byte ) = 0;  // method called on parsing complete/abort
 
-        idx newObj( u8 byte, idx parent );
-        idx newData( u8 size );
-
-        // @fmt:off
+// @fmt:off
         const ObjDef& extObjDef( idx i ) const { return (mObjDef[i]); }
 
         u8 const* extBytes( idx i ) const { return (reinterpret_cast<u8 const *>( &mObjDef[i] )); }
@@ -97,14 +92,21 @@ class Sml
         i16 extI16( idx i ) const { return (*reinterpret_cast<i16 const *>( &mObjDef[i] )); }
         i32 extI32( idx i ) const { return (*reinterpret_cast<i32 const *>( &mObjDef[i] )); }
         i64 extI64( idx i ) const { return (*reinterpret_cast<i64 const *>( &mObjDef[i] )); }
-                                                                                                                                                                                                                                                                                                                // @fmt:on
+// @fmt:on
 
         u8 objCnt() const
         {
             return mObjCnt;
         }
+
     private:
-        // @fmt:off
+        void start();           // start parsing objects (behind esc begin)
+        idx abort( u8 err );    // set to abort parsing (error or end detection)
+
+        idx newObj( u8 byte, idx parent );
+        idx newData( u8 size );
+
+// @fmt:off
         ObjDef& intObjDef( idx i ) { return (mObjDef[i]); }
 
         u8*  intBytes( idx i ) { return (reinterpret_cast<u8 *>( &mObjDef[i] )); }
@@ -114,7 +116,7 @@ class Sml
         i16* intI16( idx i ) { return (reinterpret_cast<i16 *>( &mObjDef[i] )); }
         i32* intI32( idx i ) { return (reinterpret_cast<i32 *>( &mObjDef[i] )); }
         i64* intI64( idx i ) { return (reinterpret_cast<i64 *>( &mObjDef[i] )); }
-                                                                                                                                                                                                                                                                                                                // @fmt:on
+// @fmt:on
 
         idx objParse( u8 byte );  // next input byte -> true: complete
 
@@ -298,7 +300,7 @@ class Obj
         }
 
     private:
-        // @fmt:off
+// @fmt:off
         u8 intU8() const { return (objDef().mVal); }
 
         u16 intU16() const { return (mSml.extU16( objDef().mVal )); }

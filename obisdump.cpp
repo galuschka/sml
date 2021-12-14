@@ -1,34 +1,11 @@
 #include "sml.h"
+#include "obis.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 class SmlObis : public Sml
 {
-        enum MsgId
-        {
-            OpenRequest = 0x00000100,
-            OpenResponse = 0x00000101,
-            CloseRequest = 0x00000200,
-            CloseResponse = 0x00000201,
-            GetProfilePackRequest = 0x00000300,
-            GetProfilePackResponse = 0x00000301,
-            GetProfileListRequest = 0x00000400,
-            GetProfileListResponse = 0x00000401,
-            GetProcParameterRequest = 0x00000500,
-            GetProcParameterResponse = 0x00000501,
-            SetProcParameterRequest = 0x00000600,
-            SetProcParameterResponse = 0x00000601,
-            GetListRequest = 0x00000700,
-            GetListResponse = 0x00000701,
-            GetCosemRequest = 0x00000800,
-            GetCosemResponse = 0x00000801,
-            SetCosemRequest = 0x00000900,
-            SetCosemResponse = 0x00000901,
-            ActionCosemRequest = 0x00000A00,
-            ActionCosemResponse = 0x00000A01,
-            AttentionResponse = 0x0000FF01,
-        };
         struct MeasId
         {
                 u8 id[3];
@@ -74,27 +51,17 @@ class SmlObis : public Sml
             }
         }
 
-        bool isascii( u8 byte )
-        {
-            enum
-            {
-                Space = 0x20,
-                Del = 0x7f
-            };
-            return ((byte >= Space) && (byte <= Del));
-        }
-
         bool isDeviceId( const Obj & obj )
         {
             if (!obj.isType( Type::ByteStr ))
-                return false;
+                return (false);
             u8 len;
             const u8 *s = obj.bytes( len );
             if (len < 5)
                 return (false);
             if ((*s > 20) || (*s < 6))
                 return (false);
-            if (!(isascii( s[2] ) && isascii( s[3] ) && isascii( s[4] )))
+            if (!Obis::isString( s + 2, 3 ))
                 return (false);
             return (true);
         }
@@ -152,14 +119,7 @@ void SmlObis::printObj( const char * prefix, const Obj & obj )
                 printAsDeviceId( obj );
             } else {
                 const u8 *b = obj.bytes( len );
-                bool ascii = true;
-                for (u8 i = 0; i < len; ++i) {
-                    if (!isascii( b[i] )) {
-                        ascii = false;
-                        break;
-                    }
-                }
-                if (ascii) {
+                if (Obis::isString( b, len )) {
                     printf( "%.*s", len, b );
                 } else {
                     for (u8 i = 0; i < len; ++i)
@@ -223,30 +183,19 @@ void SmlObis::obis()
 
     fputs( "{ ", stdout );
 
-    for (u8 lvl0idx = 0; msgId != CloseResponse; ++lvl0idx) {
-        /*
-         * SML message ::= SEQUENCE
-         * {
-         *     0 transactionId       Octet String,
-         *     1 groupNo             Unsigned8,
-         *     2 abortOnError        Unsigned8,
-         *  -> 3 messageBody         SML_MessageBody,
-         *     4 crc16               Unsigned16,
-         *     5 endOfSmlMsg         EndOfSmlMsg
-         * }
-         * message body ::= SEQUENCE
-         * {
-         *  -> 0 message ID
-         *  -> 1 message
-         * }
-         */
+    const char *const firstprefix = ",\n  \"values\" : [\n";
+    const char *const contprefix = ",\n";
+    const char *const postfix = " ]";
+    const char *prefix = firstprefix;
+
+    for (u8 lvl0idx = 0; msgId != Obis::MsgBody::MsgId::CloseResponse; ++lvl0idx) {
         bool typematch;
         u8 len;
         Obj objMsg { *this, lvl0idx };
-        Obj objBody { objMsg, 3 };    // body
+        Obj objBody { objMsg, Obis::Msg::MessageBody };
 
         {
-            Obj objMsgId { objBody, 0 };  //
+            Obj objMsgId { objBody, Obis::MsgBody::MessageID };
             msgId = objMsgId.getU32( typematch );
             if (!typematch) {
                 msgId = objMsgId.getU16( typematch );
@@ -257,83 +206,35 @@ void SmlObis::obis()
 
         switch (msgId)
         {
-            case OpenResponse: {
-                /*
-                 * SML_PublicOpen.Res ::= SEQUENCE
-                 * {
-                 *     0 codepage      Octet String OPTIONAL,
-                 *     1 clientId      Octet String OPTIONAL,
-                 *     2 reqFileId     Octet String,
-                 *  -> 3 serverId      Octet String,
-                 *     4 refTime       SML_Time OPTIONAL,
-                 *     5 smlVersion    Unsigned8 OPTIONAL,
-                 * }
-                 */
-                Obj objOpenres { objBody, 1 };
-                Obj objDeviceID { objOpenres, 3 };
-                printObj( "\"ID\"     : ", objDeviceID );
+            case Obis::MsgBody::MsgId::OpenResponse: {
+                Obj objOpenres { objBody, Obis::MsgBody::Message };
+                Obj objServerId { objOpenres, Obis::OpenRes::ServerId };
+                printObj( "\"SrvrId\" : ", objServerId );
             }
                 break;
 
-            case CloseResponse:
+            case Obis::MsgBody::MsgId::CloseResponse:
                 break;
 
-            case GetListResponse:  // ListResponse
-            {
-                /*
-                 * SML_GetList.Res ::= SEQUENCE
-                 * {
-                 *    0 clientId        Octet String OPTIONAL,
-                 *    1 serverId        Octet String,
-                 *    2 listName        Octet String OPTIONAL,
-                 *    3 actSensorTime   SML_Time OPTIONAL,
-                 * -> 4 valList         SML_List,
-                 *    5 listSignature   SML_Signature OPTIONAL,
-                 *    6 actGatewayTime  SML_Time OPTIONAL
-                 * }
-                 */
-                /*
-                 * SML_ListEntry ::= SEQUENCE
-                 * {
-                 *    0 objName         Octet String,
-                 *    1 status          SML_Status OPTIONAL,
-                 *    2 valTime         SML_Time OPTIONAL,
-                 *    3 unit            SML_Unit OPTIONAL,
-                 *    4 scaler          Integer8 OPTIONAL,
-                 *    5 value           SML_Value,
-                 *    6 valueSignature  SML_Signature OPTIONAL
-                 * }
-                 * objName o6
-                 *    0- Medium      Elektrizität = 1, Gas = 7, Wasser, Wärme...
-                 *    1: Kanal       interne oder externe Kanäle, nur bei mehreren Kanälen
-                 *    2. Messgröße   Wirk-, Blind-, Scheinleistung, Strom, Spannung,...
-                 *    3. Messart     Maximum, aktueller Wert, Energie...
-                 *    4* Tarifstufe  Tarifstufe, z.B. Total, Tarif 1, Tarif 2...
-                 *    5  Vorwertzählerstand 1- oder 2-stellig 00...99
-                 */
-                Obj objListRes { objBody, 1 };
-                Obj objValList { objListRes, 4 };
-                const char *sep = ",\n  \"values\" : [\n";
-                const char *close = "";
+            case Obis::MsgBody::MsgId::GetListResponse: {
+                Obj objListRes { objBody, Obis::MsgBody::Message };
+                Obj objValList { objListRes, Obis::GetListRes::ValList };
 
                 for (u8 validx = 0; validx < objValList.size(); ++validx) {
                     Obj objElem { objValList, validx };
                     {
-                        Obj objName { objElem, 0 };
+                        Obj objName { objElem, Obis::ListEntry::ObjName };
                         const u8 *measId = objName.bytes( len );
                         if (len < 6)
                             continue;
 
-                        printf( "%s  { \"idnum\" : \"%d-%d:%d.%d.%d*%d\"", sep,
-                                measId[0], measId[1], measId[2], measId[3],
-                                measId[4], measId[5] );
-                        sep = ",\n";
-                        close = " ]";
+                        printf( "%s  { \"idnum\" : \"%d-%d:%d.%d.%d*%d\"", prefix, measId[0],
+                                measId[1], measId[2], measId[3], measId[4], measId[5] );
+
+                        prefix = contprefix;
 
                         bool known = false;
-                        for (u8 eIdx = 0;
-                                eIdx < (sizeof(IdTab) / sizeof(IdTab[0]));
-                                ++eIdx) {
+                        for (u8 eIdx = 0; eIdx < (sizeof(IdTab) / sizeof(IdTab[0])); ++eIdx) {
                             MeasId const &eRef = IdTab[eIdx];
                             bool match = true;
                             bool exact = true;
@@ -342,8 +243,7 @@ void SmlObis::obis()
                                     exact = false;
                                 else if (measId[2 + j] != eRef.id[j])
                                     match = false;
-                            if (match
-                                    && (exact || known || (eRef.id[0] != 0xff))) {
+                            if (match && (exact || known || (eRef.id[0] != 0xff))) {
                                 if (!known)
                                     fputs( ",\n    \"descr\" : \"", stdout );
                                 else
@@ -357,16 +257,15 @@ void SmlObis::obis()
                         if (known)
                             putchar( '"' );
 #if 1
-                        Obj objUnit { objElem, 3 };
-                        Obj objScaler { objElem, 4 };
-                        Obj objValue { objElem, 5 };
+                        Obj objUnit { objElem, Obis::ListEntry::Unit };
+                        Obj objScaler { objElem, Obis::ListEntry::Scaler };
+                        Obj objValue { objElem, Obis::ListEntry::Value };
 
                         known = false;
 
                         u8 unit = objUnit.getU8( typematch );
-                        if (((measId[2] == 1) || (measId[2] == 2))
-                                && (measId[3] == 8) && typematch
-                                && (unit == 30)) {
+                        if (((measId[2] == 1) || (measId[2] == 2)) && (measId[3] == 8) && typematch
+                                && (unit == Obis::ListEntry::Unit::Wh)) {
                             u32 value = objValue.getU32( typematch );
                             if (!typematch)
                                 value = objValue.getU16( typematch );
@@ -378,10 +277,16 @@ void SmlObis::obis()
                                     known = true;
                                     fputs( ",\n    \"value\" : ", stdout );
                                     if (scale) {
-                                        double x = value;
-                                        for (u8 s = 0; s < scale; ++s)
-                                            x /= 10.0;
-                                        printf( "%.*f", scale, x );
+                                        char buf[12];
+                                        char *cp = Obis::mkUString( buf + 1, sizeof(buf) - 1,
+                                                                    value );
+                                        char *point = buf + sizeof(buf) - 2 - scale;
+                                        while (cp > point)
+                                            *--cp = '0';
+                                        for (char *bp = --cp; bp < point; ++bp)
+                                            bp[0] = bp[1];
+                                        *point = '.';
+                                        printf( "%s", cp );
                                     } else
                                         printf( "%d", value );
                                     fputs( ",\n    \"unit\"  : \"kWh\"",
@@ -398,25 +303,24 @@ void SmlObis::obis()
 #else
                     }
                     {
-                        Obj objValue { objElem, 5 };
+                        Obj objValue { objElem, Obis::ListEntry::Value };
                         printObj( ",\n    \"value\" : ", objValue );
                     }
                     {
-                        Obj objScaler { objElem, 4 };
+                        Obj objScaler { objElem, Obis::ListEntry::Scaler };
                         printOptional( ",\n    \"scale\" : ", objScaler );
                     }
                     {
-                        Obj objUnit { objElem, 3 };
+                        Obj objUnit { objElem, Obis::ListEntry::Unit };
                         printOptional( ",\n    \"unit\"  : ", objUnit );
 #endif
                     }
                     {
-                        Obj objTime { objElem, 2 };
+                        Obj objTime { objElem, Obis::ListEntry::ValTime };
                         printOptional( ",\n    \"time\"  : ", objTime );
                     }
                     fputs( " }", stdout );
                 }  // for validx
-                puts( close );
             }
                 break;
 
@@ -424,6 +328,7 @@ void SmlObis::obis()
                 break;
         }
     }
+    puts( prefix == contprefix ? postfix : "" );
     puts( "}" );
 }
 
@@ -435,5 +340,5 @@ int main( int argc, char ** argv )
     while (read( 0, &byte, 1 ) == 1) {
         sml.parse( byte );
     }
-    return 0;
+    return (0);
 }
