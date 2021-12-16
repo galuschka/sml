@@ -14,9 +14,12 @@ class SmlMqtt : public SmlFilter
         }
         void onFilter( const char * serverId, const char * name, Obj & objElem )
         {
-            Obj objValue { objElem, Obis::ListEntry::Value };
             char buf[12];
-            printf( "%s/%s/value %s\n", serverId, name, Obis::otoa( buf, sizeof(buf), objValue ) );
+            {
+                Obj objValue { objElem, Obis::ListEntry::Value };
+                printf( "%s/%s/value %s\n", serverId, name,
+                        Obis::otoa( buf, sizeof(buf), objValue ) );
+            }
             {
                 Obj objScaler { objElem, Obis::ListEntry::Scaler };
                 if (objScaler.typesize())
