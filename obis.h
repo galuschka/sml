@@ -100,6 +100,10 @@ enum Unit {
 
 bool isAscii( u8 byte );
 bool isString( const u8 * bytes, u8 len );
+bool isDeviceId( const Obj & obj );
+
+char * otoa( char * buf, u8 size, const Obj & obj, bool checkDevId = false );
+char * otoDevId( char * buf, u8 size, const Obj & obj );
 
 template<typename T> char * utoa( char * buf, u8 size, T x )
 {
@@ -124,9 +128,9 @@ template<typename T> char * itoa( char * buf, u8 size, T x )
     typedef typename std::make_unsigned<T>::type unsignedT;
 
     if (x >= 0)
-        return (mkUString( buf, size, static_cast<unsignedT>(x) ));
+        return (utoa( buf, size, static_cast<unsignedT>(x) ));
 
-    char * s = mkUString( buf + 1, size - 1, static_cast<unsignedT>(-x) );
+    char * s = utoa( buf + 1, size - 1, static_cast<unsignedT>(-x) );
     *--s = '-';
     return (s);
 }

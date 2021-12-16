@@ -51,36 +51,9 @@ class SmlObis : public Sml
             }
         }
 
-        bool isDeviceId( const Obj & obj )
-        {
-            if (!obj.isType( Type::ByteStr ))
-                return (false);
-            u8 len;
-            const u8 *s = obj.bytes( len );
-            if (len < 5)
-                return (false);
-            if ((*s > 20) || (*s < 6))
-                return (false);
-            if (!Obis::isString( s + 2, 3 ))
-                return (false);
-            return (true);
-        }
-
-        void printAsDeviceId( const Obj & obj )
-        {
-            u8 len;
-            const u8 *id = obj.bytes( len );
-            u32 sno = 0;
-            for (u8 i = 5; i < len; ++i) {
-                sno <<= 8;
-                sno |= id[i];
-            }
-            printf( "%d%.3s%0*u", id[1], id + 2, id[0], sno );
-        }
-
         void printOptional( const char * prefix, const Obj & obj )
         {
-            if (obj.typesize() != Type::ByteStr)
+            if (obj.typesize() != Type::ByteStr)  // 0-sized byte string -> skip
                 printObj( prefix, obj );
         }
 
@@ -115,8 +88,9 @@ void SmlObis::printObj( const char * prefix, const Obj & obj )
     {
         case Type::ByteStr:
             putchar( '"' );
-            if (isDeviceId( obj )) {
-                printAsDeviceId( obj );
+            if (Obis::isDeviceId( obj )) {
+                char devId[20];
+                printf( "%s", Obis::otoDevId( devId, sizeof(devId), obj ) );
             } else {
                 const u8 *b = obj.bytes( len );
                 if (Obis::isString( b, len )) {
@@ -179,8 +153,6 @@ void SmlObis::printObj( const char * prefix, const Obj & obj )
 
 void SmlObis::obis()
 {
-    u32 msgId = 0;
-
     fputs( "{ ", stdout );
 
     const char *const firstprefix = ",\n  \"values\" : [\n";
@@ -188,6 +160,7 @@ void SmlObis::obis()
     const char *const postfix = " ]";
     const char *prefix = firstprefix;
 
+    u32 msgId = 0;
     for (u8 lvl0idx = 0; msgId != Obis::MsgBody::MsgId::CloseResponse; ++lvl0idx) {
         bool typematch;
         u8 len;
