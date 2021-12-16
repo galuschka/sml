@@ -46,7 +46,7 @@ char* otoa( char * buf, u8 size, const Obj & obj, bool checkDevId )
             if ((size >= (len + 2)) && isString( b, len )) {
                 *buf = 's';
                 memcpy( buf + 1, b, len );
-                buf[len] = 0;
+                buf[len + 1] = 0;
                 return (buf);
             }
             if (size < (len * 2 + 2)) {
@@ -137,7 +137,7 @@ char* otoDevId( char * buf, u8 size, const Obj & obj )
     char *devId = utoa( buf, size, sno );
     if (*devId == '#')
         return devId;
-    while (devId > (buf + size - id[0]))
+    while (devId >= (buf + size - id[0]))
         *--devId = '0';
     *--devId = id[4];
     *--devId = id[3];
