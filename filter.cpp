@@ -47,20 +47,7 @@ void SmlFilter::onReady( u8 err, u8 byte )
                 {
                     Obj objListRes { objBody, Obis::MsgBody::Message };
                     Obj objValList { objListRes, Obis::GetListRes::ValList };
-
-                    for (u8 validx = 0; validx < objValList.size(); ++validx) {
-                        Obj objElem { objValList, validx };
-                        Obj objObjName { objElem, Obis::ListEntry::ObjName };
-                        const u8 *objName = objObjName.bytes( len );
-                        if (!objName || (len < 6))
-                            continue;
-                        if (!filter( objName, len ))
-                            continue;
-                        char name[24];
-                        snprintf( name, sizeof(name), "%d-%d:%d.%d.%d*%d", objName[0], objName[1],
-                                  objName[2], objName[3], objName[4], objName[5] );
-                        onFilter( serverId, name, objElem );
-                    }
+                    filter( serverId, objValList );
                 }
                 break;
 
