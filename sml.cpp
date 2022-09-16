@@ -195,31 +195,17 @@ idx Sml::newObj( u8 byte, idx parent )  // object constructor
 
 idx Sml::newData( u8 size )
 {
-    u8 effsize = size;
-    switch (size)
-    {
-        case 1:
-            effsize = sizeof(u8);
-            break;
-        case 2:
-            effsize = sizeof(u16);
-            break;
-        case 4:
-            effsize = sizeof(u32);
-            break;
-        case 8:
-            effsize = sizeof(u64);
-            break;
-        default:
-            break;
-    }
-    const u8 nofObjs = (effsize + sizeof(ObjDef) - 1) / sizeof(ObjDef);
+    const u8 nofObjs = (size + sizeof(ObjDef) - 1) / sizeof(ObjDef);
+
+    // todo: make it 64-bit savvy for 64-bit architecture:
+    //       check size 8 because of scalar (not octet string)
+    //       and align mObjCnt before assignment to ret
 
     if (mObjCnt >= (cMaxNofObj - nofObjs))
         return (0);
     const idx ret = mObjCnt;
     mObjCnt += nofObjs;
-    memset( intBytes( ret ), 0, effsize );
+    memset( intBytes( ret ), 0, size );
     return (ret);
 }
 

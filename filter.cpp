@@ -5,6 +5,8 @@
 
 void SmlFilter::onReady( u8 err, u8 byte )
 {
+    ++mErrCnt[err < Err::Unknown ? err : Err::Unknown];
+
     if (err != Err::NoError)
         return;
 

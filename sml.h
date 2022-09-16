@@ -57,6 +57,8 @@ enum Err
     OutOfMemory,	// cMaxNofObj too small
     InvalidType,
     CrcError,
+
+    Unknown         // number of error types and index for invalid err values
 };
 }
 
@@ -131,7 +133,9 @@ class Sml
         u8 mByteCnt;                  // common byte counter
         idx mObjCnt;                  // next free object index
         idx mParsing;                 // pointer to currently parsed object
-        ObjDef mObjDef[cMaxNofObj];   // storage of objects
+        // 4-byte alignment is fine, since either u64 is in SW anyway
+        // (on 32-bit architecture) or we have to check alignment in newData()
+        alignas(4) ObjDef mObjDef[cMaxNofObj];   // storage of objects
         idx mElemCnt[cMaxListDepth];  // to stack the list elements counters
 
         enum Status
