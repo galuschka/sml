@@ -105,7 +105,7 @@ class Sml
         i64 extI64( idx i ) const { return (*reinterpret_cast<i64 const *>( &mObjDef[i] )); }
 // @fmt:on
 
-        u8 objCnt() const
+        idx objCnt() const
         {
             return mObjCnt;
         }
@@ -234,11 +234,11 @@ class Obj
             return (size( typesize() ));
         }
 
-        bool isType( u8 type ) const
+        bool isType( u8 cmptype ) const
         {
             if (!mIdx || (mIdx >= mSml.objCnt()))
                 return (false);
-            return (typesize() == type);
+            return (type() == cmptype);
         }
         bool isTypeSize( u8 type, u8 size ) const
         {
@@ -331,6 +331,8 @@ class Obj
             typematch = false;
             return (-1);
         }
+
+        void dump( const char * name ) const;
 
     private:
 // @fmt:off

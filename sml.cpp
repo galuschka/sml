@@ -171,6 +171,12 @@ void Sml::dump( const char * header )
     }
 }
 
+void Obj::dump( const char * name ) const
+{
+    printf( "%s: mIdx: %d, next: %d, type %02x, size %d, mVal: %d\n",
+        name, mIdx, objDef().mNext, type(), size(), objDef().mVal );
+}
+
 idx Sml::newObj( u16 typeSize, idx parent )  // object constructor
 {
     if (mObjCnt >= (cMaxNofObj - 1))

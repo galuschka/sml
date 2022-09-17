@@ -165,13 +165,19 @@ void SmlObis::obis()
         bool typematch;
         u8 len;
         Obj objMsg { *this, lvl0idx };
+        // objMsg.dump( "objMsg" );
         Obj objBody { objMsg, Obis::Msg::MessageBody };
+        // objBody.dump( "objBody" );
 
         {
             Obj objMsgId { objBody, Obis::MsgBody::MessageID };
+            // objMsgId.dump( "objMsgId" );
+
             msgId = objMsgId.getU32( typematch );
+            // printf( "msgid u32: %u (%d)\n", msgId, typematch );
             if (!typematch) {
                 msgId = objMsgId.getU16( typematch );
+                // printf( "msgid u16: %u (%d)\n", msgId, typematch );
                 if (!typematch)
                     break;
             }
