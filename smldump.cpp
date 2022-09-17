@@ -52,5 +52,6 @@ int main( int argc, char ** argv )
     while (read( 0, &byte, 1 ) == 1) {
         sml.parse( byte );
     }
+    sml.dump( "remaining data" );
     return (0);
 }

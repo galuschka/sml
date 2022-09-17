@@ -13,9 +13,9 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
-typedef u8 idx;
+typedef u16 idx;        // number of objects for extended output is close to 256
 
-const idx cMaxNofObj = 150;   // <- adjust according your needs
+const idx cMaxNofObj = 0x120;   // <- adjust according your needs
 const u8 cMaxListDepth = 10;  // while parsing nested list, we have to save old element counter
 const u8 cMinNofEscBegin = 3;  // ok, when Byte::Begin after 3 Byte::Escape
 const u8 cNofEscBegin = 4;    // usual number of Byte::Escape
@@ -32,10 +32,19 @@ enum Byte
     Escape = 0x1b,
     SizeMask = 0x0f,
     TypeMask = 0x70,
-    OtherBit = 0x80,
+    FollowBit = 0x80,  // see example below
     TypeShift = 4,  // type >> 4 is basic type value
+
+// FollowBit example: input data: f1 04
+//  f1 & 80 == 80: follow bit set -> next byte will be added to type-length
+//  f1 & 70 == 70: ByteType::List (note: when type boolean, type is extended - not length)
+//  f1 & 0f == 01: first 4 length bits: 1 (will be shifted by 4 for each following)
+//  04 & 80 ==  0: no more following length bits
+//  04 & 0f ==  4: next 4 length bits: 4 -> ((1 << 4)|4) = 0x14
+// f1 04 ==> List of 0x14 (decimal 20) elements
 };
 }
+
 namespace Type {
 enum Type
 {
@@ -69,8 +78,8 @@ class ObjDef
     public:
         idx mParent;   // parent list (the list containing this)
         idx mNext;     // next element in same list (nil when last)
-        u8 mTypeSize;  // type and number of ... (or 0 when root list)
-        idx mVal;      // byte value or index to list or index to value
+        u16 mTypeSize; // object type and size (type nibble shifted by 8)
+        idx mVal;      // u8 or u16 value or index to list or index to value
 };
 
 class Sml
@@ -80,7 +89,7 @@ class Sml
         virtual ~Sml() = 0;
 
         void parse( u8 byte );  // parse next input byte
-        void dump();            // dump the struct
+        void dump( const char * header = 0 );  // dump the struct
 
         virtual void onReady( u8 err, u8 byte ) = 0;  // method called on parsing complete/abort
 
@@ -105,8 +114,8 @@ class Sml
         void start();           // start parsing objects (behind esc begin)
         idx abort( u8 err );    // set to abort parsing (error or end detection)
 
-        idx newObj( u8 byte, idx parent );
-        idx newData( u8 size );
+        idx newObj( u16 typesize, idx parent );
+        idx newData( u16 size );
 
 // @fmt:off
         ObjDef& intObjDef( idx i ) { return (mObjDef[i]); }
@@ -196,26 +205,46 @@ class Obj
         {
             return (mSml.extObjDef( mIdx ));
         }
-        u8 typesize() const
+        u16 typesize() const
         {
             if (!mIdx || (mIdx >= mSml.objCnt()))
                 return (0);
             return (objDef().mTypeSize);
         }
-        u8 type() const
+
+        static u16 typesize( u8 type, u16 size )
         {
-            return (typesize() & Byte::TypeMask);
+            return (((u16) type) << 8) | size;
         }
-        u8 size() const
+        static u8 type( u16 typesize )
         {
-            return (typesize() & Byte::SizeMask);
+            return ((typesize >> 8) & Byte::TypeMask);
+        }
+        static u16 size( u16 typesize )
+        {
+            return (typesize & ((Byte::SizeMask << 8) | 0xff));
         }
 
-        bool isType( u8 t ) const
+        u8 type() const
+        {
+            return (type( typesize() ));
+        }
+        u16 size() const
+        {
+            return (size( typesize() ));
+        }
+
+        bool isType( u8 type ) const
         {
             if (!mIdx || (mIdx >= mSml.objCnt()))
                 return (false);
-            return (type() == (t & Byte::TypeMask));
+            return (typesize() == type);
+        }
+        bool isTypeSize( u8 type, u8 size ) const
+        {
+            if (!mIdx || (mIdx >= mSml.objCnt()))
+                return (false);
+            return (typesize() == typesize( type, size ));
         }
 
         const u8* bytes( u8 & len ) const
@@ -224,15 +253,15 @@ class Obj
                 len = 0;
                 return (nullptr);
             }
-            len = typesize() & Byte::SizeMask;
-            if (len <= 1)
-                return (&objDef().mVal);
+            len = size();
+            if (len <= sizeof(idx))
+                return (u8*)(&objDef().mVal);
             return (mSml.extBytes( objDef().mVal ));
         }
 
         u8 getU8( bool & typematch ) const
         {
-            if (typesize() == (Type::Unsigned | 1)) {
+            if (typesize() == typesize( Type::Unsigned, 1 )) {
                 typematch = true;
                 return (intU8());
             }
@@ -241,7 +270,7 @@ class Obj
         }
         u16 getU16( bool & typematch ) const
         {
-            if (typesize() == (Type::Unsigned | 2)) {
+            if (typesize() == typesize( Type::Unsigned, 2 )) {
                 typematch = true;
                 return (intU16());
             }
@@ -250,7 +279,7 @@ class Obj
         }
         u32 getU32( bool & typematch ) const
         {
-            if (typesize() == (Type::Unsigned | 4)) {
+            if (typesize() == typesize( Type::Unsigned, 4 )) {
                 typematch = true;
                 return (intU32());
             }
@@ -259,7 +288,7 @@ class Obj
         }
         u64 getU64( bool & typematch ) const
         {
-            if (typesize() == (Type::Unsigned | 8)) {
+            if (typesize() == typesize( Type::Unsigned, 8 )) {
                 typematch = true;
                 return (intU64());
             }
@@ -268,7 +297,7 @@ class Obj
         }
         i8 getI8( bool & typematch ) const
         {
-            if (typesize() == (Type::Integer | 1)) {
+            if (typesize() == typesize( Type::Integer, 1 )) {
                 typematch = true;
                 return (intI8());
             }
@@ -277,7 +306,7 @@ class Obj
         }
         i16 getI16( bool & typematch ) const
         {
-            if (typesize() == (Type::Integer | 2)) {
+            if (typesize() == typesize( Type::Integer, 2 )) {
                 typematch = true;
                 return (intI16());
             }
@@ -286,7 +315,7 @@ class Obj
         }
         i32 getI32( bool & typematch ) const
         {
-            if (typesize() == (Type::Integer | 4)) {
+            if (typesize() == typesize( Type::Integer, 4 )) {
                 typematch = true;
                 return (intI32());
             }
@@ -295,7 +324,7 @@ class Obj
         }
         i64 getI64( bool & typematch ) const
         {
-            if (typesize() == (Type::Integer | 8)) {
+            if (typesize() == typesize( Type::Integer, 8 )) {
                 typematch = true;
                 return (intI64());
             }
@@ -305,14 +334,13 @@ class Obj
 
     private:
 // @fmt:off
-        u8 intU8() const { return (objDef().mVal); }
-
-        u16 intU16() const { return (mSml.extU16( objDef().mVal )); }
+        u8  intU8()  const { return (u8)  objDef().mVal; }
+        u16 intU16() const { return (u16) objDef().mVal; }
         u32 intU32() const { return (mSml.extU32( objDef().mVal )); }
         u64 intU64() const { return (mSml.extU64( objDef().mVal )); }
 
-        i8  intI8() const { return (objDef().mVal); }
-        i16 intI16() const { return (mSml.extI16( objDef().mVal )); }
+        i8  intI8()  const { return (i8)  objDef().mVal; }
+        i16 intI16() const { return (i16) objDef().mVal; }
         i32 intI32() const { return (mSml.extI32( objDef().mVal )); }
         i64 intI64() const { return (mSml.extI64( objDef().mVal )); }
 // @fmt:on
