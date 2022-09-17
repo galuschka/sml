@@ -22,18 +22,6 @@ void SmlMqtt::filter( const char * serverId, Obj & objValList )
 
         if (objName[0] != 1)
             continue;
-        if (objName[3] == 8) {
-            // 1-*:{1,2}.8.*   Strom {Bezug,Einspeisung}
-            if ((objName[2] < 1) || (objName[2] > 2))
-                continue;
-        } else if (objName[3] == 7) {
-            // 1-*:{36,56,76}.7.*   Leistung 3 Phasen)
-            u8 phase = (objName[2]-36)/20;
-            if ((phase >= 3) || (objName[2] != ((phase*20)+36)))
-                continue;
-        } else {
-            continue;
-        }
 
         char name[24];
         snprintf( name, sizeof(name), "%d-%d:%d.%d.%d*%d", objName[0], objName[1],

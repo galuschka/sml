@@ -207,7 +207,7 @@ void SmlObis::obis()
                         if (len < 6)
                             continue;
 
-                        printf( "%s  { \"idnum\" : \"%d-%d:%d.%d.%d*%d\"", prefix, measId[0],
+                        printf( "%s  { \"idnum\": \"%d-%d:%d.%d.%d*%d\"", prefix, measId[0],
                                 measId[1], measId[2], measId[3], measId[4], measId[5] );
 
                         prefix = contprefix;
@@ -224,7 +224,7 @@ void SmlObis::obis()
                                     match = false;
                             if (match && (exact || known || (eRef.id[0] != 0xff))) {
                                 if (!known)
-                                    fputs( ",\n    \"descr\" : \"", stdout );
+                                    fputs( ", \"descr\": \"", stdout );
                                 else
                                     fputs( " - ", stdout );
                                 known = true;
@@ -240,26 +240,28 @@ void SmlObis::obis()
                         Obj objScaler { objElem, Obis::ListEntry::Scaler };
                         Obj objValue { objElem, Obis::ListEntry::Value };
 
-                        known = false;
-                        do {  // while(false) - avoid goto
-                            if ((measId[3] != 8) || (((measId[2] != 1) && (measId[2] != 2))))
-                                break;
+                        i8 scaler = objScaler.getI8( typematch );
+                        if (!typematch)
+                            scaler = 0;
 
-                            u8 unit = objUnit.getU8( typematch );
-                            if (!typematch || (unit != Obis::ListEntry::Unit::Wh))
-                                break;
+                        u8 unit = objUnit.getU8( typematch );
+                        const char * unitStr = Obis::unittoa( unit );
 
-                            i8 precision = 3 - objScaler.getI8( typematch );  // precision of kWh
-                            if (!typematch || (precision < 0))
-                                break;
+                        if (unit == Obis::ListEntry::Unit::Wh) {
+                            scaler -= 3;
+                            unitStr = "kWh";
+                        }
 
-                            if (!precision) {
-                                printObj( ",\n    \"value\" : ", objValue );
-                                fputs( ",\n    \"unit\"  : \"kWh\"", stdout );
-                                known = true;
-                                break;
+                        if (!scaler) {
+                            printObj( ", \"value\": ", objValue );
+                            if (typematch) {
+                                fputs( ", \"unit\": ", stdout );
+                                if (unitStr)
+                                    printf( "\"%s\"", unitStr );
+                                else
+                                    printf( "%d", unit );
                             }
-
+                        } else {
                             u32 value = objValue.getU32( typematch );
                             if (!typematch) {
                                 value = objValue.getU16( typematch );
@@ -275,24 +277,22 @@ void SmlObis::obis()
                             if (*cp == '#')
                                 break;
 
-                            char *point = buf + sizeof(buf) - 2 - precision;
+                            char *point = buf + sizeof(buf) - 2 + scaler;
                             while (cp > point)
                                 *--cp = '0';    //      00xyz
                             for (char *bp = --cp; bp < point; ++bp)
                                 bp[0] = bp[1];  // move integer part digits one ahead
                             *point = '.';       // rstuv.wxyz
 
-                            fputs( ",\n    \"value\" : ", stdout );
+                            fputs( ", \"value\": ", stdout );
                             fputs( cp, stdout );
-                            fputs( ",\n    \"unit\"  : \"kWh\"", stdout );
-                            known = true;
-
-                        } while (false);
-
-                        if (!known) {
-                            printObj( ",\n    \"value\" : ", objValue );
-                            printOptional( ",\n    \"scale\" : ", objScaler );
-                            printOptional( ",\n    \"unit\"  : ", objUnit );
+                            if (typematch) {
+                                fputs( ", \"unit\": ", stdout );
+                                if (unitStr)
+                                    printf( "\"%s\"", unitStr );
+                                else
+                                    printf( "%d", unit );
+                            }
                         }
 #else
                     }
@@ -311,7 +311,7 @@ void SmlObis::obis()
                     }
                     {
                         Obj objTime { objElem, Obis::ListEntry::ValTime };
-                        printOptional( ",\n    \"time\"  : ", objTime );
+                        printOptional( ", \"time\": ", objTime );
                     }
                     fputs( " }", stdout );
                 }  // for validx
