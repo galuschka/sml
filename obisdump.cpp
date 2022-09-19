@@ -198,14 +198,6 @@ void SmlObis::obis()
 
                         prefix = contprefix;
 
-                        std::string descr;
-                        Obis::id2string( descr, measId );
-                        if (! descr.empty()) {
-                            fputs( ", \"descr\": \"", stdout );
-                            fputs( descr.c_str(), stdout );
-                            putchar( '"' );
-                        }
-#if 1
                         Obj objUnit { objElem, Obis::ListEntry::Unit };
                         Obj objScaler { objElem, Obis::ListEntry::Scaler };
                         Obj objValue { objElem, Obis::ListEntry::Value };
@@ -264,25 +256,21 @@ void SmlObis::obis()
                                     printf( "%d", unit );
                             }
                         }
-#else
+                        {
+                            Obj objTime { objElem, Obis::ListEntry::ValTime };
+                            printOptional( ", \"time\": ", objTime );
+                        }
+                        {
+                            std::string descr;
+                            Obis::id2string( descr, measId );
+                            if (! descr.empty()) {
+                                fputs( ", \"descr\": \"", stdout );
+                                fputs( descr.c_str(), stdout );
+                                putchar( '"' );
+                            }
+                        }
                     }
-                    {
-                        Obj objValue { objElem, Obis::ListEntry::Value };
-                        printObj( ",\n    \"value\" : ", objValue );
-                    }
-                    {
-                        Obj objScaler { objElem, Obis::ListEntry::Scaler };
-                        printOptional( ",\n    \"scale\" : ", objScaler );
-                    }
-                    {
-                        Obj objUnit { objElem, Obis::ListEntry::Unit };
-                        printOptional( ",\n    \"unit\"  : ", objUnit );
-#endif
-                    }
-                    {
-                        Obj objTime { objElem, Obis::ListEntry::ValTime };
-                        printOptional( ", \"time\": ", objTime );
-                    }
+
                     fputs( " }", stdout );
                 }  // for validx
             }
