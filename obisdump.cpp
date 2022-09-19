@@ -1,5 +1,7 @@
 #include "sml.h"
 #include "obis.h"
+#include "obisid.h"
+#include "obisunit.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,23 +62,7 @@ class SmlObis : public Sml
         void printObj( const char * prefix, const Obj & obj );
 
         void obis();
-
-        static const MeasId IdTab[];
 };
-
-const SmlObis::MeasId SmlObis::IdTab[] = {
-// @fmt:off
-        { {  96,  50,   1 }, "Manufacturer ID", "Herstellerkennung" },
-        { {  96,   1,   0 }, "Device ID",       "Geräteidentifikation" },
-        { {   0,   2,   0 }, "Firmware version","Firmware-Version" },
-        { {   1,   8, 255 }, "Work purchase",   "Arbeit Bezug" },
-        { {   2,   8, 255 }, "Work feed-in",    "Arbeit Einspeisung" },
-        { {  16,   7, 255 }, "Current power",   "Momentane Wirkleistung" },
-        { { 255, 255,   0 }, "No tariff",       "tariflos" },
-        { { 255, 255,   1 }, "Tariff 1",        "Tarif 1" },
-        { { 255, 255,   2 }, "Tariff 2",        "Tarif 2" },
-};
-// @fmt:on
 
 void SmlObis::printObj( const char * prefix, const Obj & obj )
 {
@@ -212,29 +198,13 @@ void SmlObis::obis()
 
                         prefix = contprefix;
 
-                        bool known = false;
-                        for (u8 eIdx = 0; eIdx < (sizeof(IdTab) / sizeof(IdTab[0])); ++eIdx) {
-                            MeasId const &eRef = IdTab[eIdx];
-                            bool match = true;
-                            bool exact = true;
-                            for (u8 j = 0; j < 3; ++j)
-                                if (eRef.id[j] == 0xff)
-                                    exact = false;
-                                else if (measId[2 + j] != eRef.id[j])
-                                    match = false;
-                            if (match && (exact || known || (eRef.id[0] != 0xff))) {
-                                if (!known)
-                                    fputs( ", \"descr\": \"", stdout );
-                                else
-                                    fputs( " - ", stdout );
-                                known = true;
-                                fputs( eRef.en, stdout );
-                            }
-                            if (match && exact)
-                                break;
-                        }
-                        if (known)
+                        std::string descr;
+                        Obis::id2string( descr, measId );
+                        if (! descr.empty()) {
+                            fputs( ", \"descr\": \"", stdout );
+                            fputs( descr.c_str(), stdout );
                             putchar( '"' );
+                        }
 #if 1
                         Obj objUnit { objElem, Obis::ListEntry::Unit };
                         Obj objScaler { objElem, Obis::ListEntry::Scaler };
@@ -245,7 +215,7 @@ void SmlObis::obis()
                             scaler = 0;
 
                         u8 unit = objUnit.getU8( typematch );
-                        const char * unitStr = Obis::unittoa( unit );
+                        const char * unitStr = Obis::unit2string( unit );
 
                         if (unit == Obis::ListEntry::Unit::Wh) {
                             scaler -= 3;

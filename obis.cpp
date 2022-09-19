@@ -28,26 +28,6 @@ constexpr char hexchar( u8 nibble )
     return (nibble + '0' + ((nibble / 10) * ('A' - '0')));
 }
 
-const char * unittoa( u8 unit )
-{
-    switch (unit)
-    {
-        case  8: return ("°");
-        case  9: return ("°C");
-        case 52: return ("K");
-        case 24: return ("bar");
-        case 27: return ("W");
-        case 30: return ("Wh");
-        case 33: return ("A");
-        case 34: return ("C"); // coulomb C = As
-        case 35: return ("V");	
-        case 38: return ("Ω");
-        case 43: return ("H");
-        case 44: return ("Hz");
-        default: return 0;
-    }
-}
-
 char* otoa( char * buf, u8 size, const Obj & obj, bool checkDevId )
 {
     u8 len;
