@@ -39,20 +39,25 @@ void Obis::id2string( std::string & out, const uint8_t * id )
     static const char * phase   = " in phase L";
     static const char * neutral = " in neutral";
 
-    const char * si = nullptr;
-    uint8_t      ii = 0;
+    const char * s4 = nullptr;
+    uint8_t      i4 = 0;
 
     if (e == 0) {
         if ((c < 20) && (d == 8)) {
-            si = total;  // total over all tariffs
+            s4 = total;  // total over all tariffs
         } else {
-            ii = c / 20;  // 0..:total, 20..:L1, 40..:L1, 60..:L3, 80..:neutral
-            if (ii)
-                si = phase;
+            i4 = c / 20;  // 0..:total, 20..:L1, 40..:L1, 60..:L3, 80..:neutral
+            if (i4) {
+                s4 = phase;
+                if (i4 == 4) {
+                    s4 = neutral;
+                    i4 = 0;
+                }
+            }
         }
     } else if (e < 10) {
-        si = tariff;
-        ii = e;
+        s4 = tariff;
+        i4 = e;
     }
     const char * s2 = nullptr;
     const char * s3 = nullptr;
@@ -92,23 +97,23 @@ void Obis::id2string( std::string & out, const uint8_t * id )
             break;
 
         case 7:
-            if ((si == phase) && (ii == 0))
-                si = nullptr;  // suppress "total" for cumulated values over all phases
+            if ((s4 == phase) && (i4 == 0))
+                s4 = nullptr;  // suppress "total" for cumulated values over all phases
 
             if (c == 81) {
                 s1 = "Phase angle";
                 s2 = nullptr;
                 s3 = nullptr;
-                si = nullptr;
+                s4 = nullptr;
                 switch (e)
                 {
-                    case  1: s2 = " L1 to L2"; ii = 2; break;
-                    case  2: s2 = " L1 to L3"; ii = 3; break;
+                    case  1: s2 = " L1 to L2"; i4 = 2; break;
+                    case  2: s2 = " L1 to L3"; i4 = 3; break;
                     case  4:
                     case 15:
                     case 26: s2 = " current to voltage";
-                             si = phase;
-                             ii = (e / 11) + 1;
+                             s4 = phase;
+                             i4 = (e / 11) + 1;
                              break;
                 }
                 break;
@@ -118,7 +123,7 @@ void Obis::id2string( std::string & out, const uint8_t * id )
                 case 11: s1 = "Instantaneous"; s2 = " current"; s3 = " (I)"; break;
                 case 12: s1 = "Instantaneous"; s2 = " voltage"; s3 = " (U)"; break;
                 case 13: s1 = "Instantaneous"; s2 = " power factor"; s3 = nullptr; break;
-                case 14: s1 = "Frequency"; s2 = nullptr; s3 = nullptr; si = nullptr; break;
+                case 14: s1 = "Frequency"; s2 = nullptr; s3 = nullptr; s4 = nullptr; break;
             }
             break;
 
@@ -143,13 +148,9 @@ void Obis::id2string( std::string & out, const uint8_t * id )
     if (s3)
         out += s3;
 
-    if (si) {
-        if ((si == phase) && (ii == 4))
-            out += neutral;
-        else {
-            out += si;
-            if (ii)
-                out += std::to_string( (int) ii );
-        }
+    if (s4) {
+        out += s4;
+        if (i4)
+            out += std::to_string( (int) i4 );
     }
 }

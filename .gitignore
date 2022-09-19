@@ -1,5 +1,6 @@
-/Debug/
-/test/
-/.cproject
-/.project
-/.settings
+build/
+Debug/
+test/
+.cproject
+.project
+.settings/

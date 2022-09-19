@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 class SmlMqtt : public SmlFilter
 {
@@ -56,10 +59,17 @@ void SmlMqtt::filter( const char * serverId, Obj & objValList )
 
 int main( int argc, char ** argv )
 {
+    int fd = 0;
+    if (argv[1])
+        if ((fd = open( argv[1], O_RDONLY, 0 )) < 0) {
+            printf( "can't open \"%s\"\n", argv[1] );
+            exit (1);
+        }
+
     SmlMqtt sml { };
 
     u8 byte;
-    while (read( 0, &byte, 1 ) == 1) {
+    while (read( fd, &byte, 1 ) == 1) {
         sml.parse( byte );
     }
     const u32 * errCnt = sml.getErrCntArray();
