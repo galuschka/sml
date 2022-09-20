@@ -1,4 +1,4 @@
-#include "sml.h"
+#include "smldump.h"
 #include "obis.h"
 #include "obisid.h"
 #include "obisunit.h"
@@ -9,52 +9,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-class SmlObis : public Sml
+
+class SmlObis : public SmlDump
 {
-        struct MeasId
-        {
-                u8 id[3];
-                const char *en;
-                const char *de;
-        };
-
-        void onReady( u8 err, u8 byte )
-        {
-            switch (err)
-            {
-                case Err::NoError:
-                    obis();
-                    break;
-
-                case Err::OutOfMemory:
-                    printf( "\n!!! out of memory: (offset %d -> increase cMaxNofObj = %d) !!!"
-                            " (the following packet is invalid)\n",
-                            mOffset, cMaxNofObj );
-                    dump();
-                    break;
-
-                case Err::InvalidType:
-                    printf( "\n!!! invalid type: char %02x at offset %d !!!"
-                            " (the following packet is invalid)\n",
-                            byte, mOffset );
-                    dump();
-                    break;
-
-                case Err::CrcError:
-                    printf( "\n!!! CRC error: read %04x / calc %04x !!!"
-                            " (the following packet is invalid)\n",
-                            mCrcRead, mCrc.get() );
-                    dump();
-                    break;
-
-                default:
-                    printf( "\n!!! unknown error %d: (char %02x at offset %d) !!!"
-                            " (the following packet is invalid)\n",
-                            err, byte, mOffset );
-                    dump();
-                    break;
-            }
-        }
+        void onReady( u8 err, u8 byte );
 
         void printOptional( const char * prefix, const Obj & obj )
         {
@@ -65,7 +23,59 @@ class SmlObis : public Sml
         void printObj( const char * prefix, const Obj & obj );
 
         void obis();
+
+    public:
+        static SmlObis & Instance();
 };
+
+SmlObis & SmlObis::Instance()
+{
+    static SmlObis sml{};
+    return sml;
+}
+
+Sml & Sml::Instance()
+{
+    return SmlObis::Instance();
+}
+
+void SmlObis::onReady( u8 err, u8 byte )
+{
+    switch (err)
+    {
+        case Err::NoError:
+            obis();
+            break;
+
+        case Err::OutOfMemory:
+            printf( "\n!!! out of memory: (offset %d -> increase cMaxNofObj = %d) !!!"
+                    " (the following packet is invalid)\n",
+                    mOffset, cMaxNofObj );
+            dump();
+            break;
+
+        case Err::InvalidType:
+            printf( "\n!!! invalid type: char %02x at offset %d !!!"
+                    " (the following packet is invalid)\n",
+                    byte, mOffset );
+            dump();
+            break;
+
+        case Err::CrcError:
+            printf( "\n!!! CRC error: read %04x / calc %04x !!!"
+                    " (the following packet is invalid)\n",
+                    mCrcRead, mCrc.get() );
+            dump();
+            break;
+
+        default:
+            printf( "\n!!! unknown error %d: (char %02x at offset %d) !!!"
+                    " (the following packet is invalid)\n",
+                    err, byte, mOffset );
+            dump();
+            break;
+    }
+}
 
 void SmlObis::printObj( const char * prefix, const Obj & obj )
 {
@@ -285,22 +295,4 @@ void SmlObis::obis()
     }
     puts( prefix == contprefix ? postfix : "" );
     puts( "}" );
-}
-
-int main( int argc, char ** argv )
-{
-    int fd = 0;
-    if (argv[1])
-        if ((fd = open( argv[1], O_RDONLY, 0 )) < 0) {
-            printf( "can't open \"%s\"\n", argv[1] );
-            exit (1);
-        }
-
-    SmlObis sml { };
-
-    u8 byte;
-    while (read( fd, &byte, 1 ) == 1) {
-        sml.parse( byte );
-    }
-    return (0);
 }

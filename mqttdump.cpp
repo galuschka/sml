@@ -11,7 +11,22 @@
 class SmlMqtt : public SmlFilter
 {
         void filter( const char * serverId, Obj & objValList );
+        void dump( const char * header = nullptr ) {}
+
+    public:
+        static SmlMqtt & Instance();
 };
+
+SmlMqtt & SmlMqtt::Instance()
+{
+    static SmlMqtt sml{};
+    return sml;
+}
+
+Sml & Sml::Instance()
+{
+    return SmlMqtt::Instance();
+}
 
 void SmlMqtt::filter( const char * serverId, Obj & objValList )
 {
@@ -55,31 +70,4 @@ void SmlMqtt::filter( const char * serverId, Obj & objValList )
                         Obis::otoa( buf, sizeof(buf), objTime ) );
         }
     }
-}
-
-int main( int argc, char ** argv )
-{
-    int fd = 0;
-    if (argv[1])
-        if ((fd = open( argv[1], O_RDONLY, 0 )) < 0) {
-            printf( "can't open \"%s\"\n", argv[1] );
-            exit (1);
-        }
-
-    SmlMqtt sml { };
-
-    u8 byte;
-    while (read( fd, &byte, 1 ) == 1) {
-        sml.parse( byte );
-    }
-    const u32 * errCnt = sml.getErrCntArray();
-    printf( "valid packets: %8u\n",   errCnt[Err::NoError] );
-    printf( "out of memory: %8u%s\n", errCnt[Err::OutOfMemory],
-                                      errCnt[Err::OutOfMemory]
-                                   ? " -> increase cMaxNofObj in sml.h!" : "" );
-    printf( "type errors:   %8u\n",   errCnt[Err::InvalidType] );
-    printf( "CRC errors:    %8u\n",   errCnt[Err::CrcError] );
-    printf( "unknown errors:%8u\n",   errCnt[Err::Unknown] );
-
-    return (0);
 }

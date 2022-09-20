@@ -88,10 +88,12 @@ class Sml
         Sml();
         virtual ~Sml() = 0;
 
+        static Sml & Instance();
+
         void parse( u8 byte );  // parse next input byte
-        void dump( const char * header = 0 );  // dump the struct
 
         virtual void onReady( u8 err, u8 byte ) = 0;  // method called on parsing complete/abort
+        virtual void dump( const char * header = nullptr ) = 0;  // dump the struct
 
 // @fmt:off
         const ObjDef& extObjDef( idx i ) const { return (mObjDef[i]); }
@@ -117,9 +119,12 @@ class Sml
         idx newObj( u16 typesize, idx parent );
         idx newData( u16 size );
 
-// @fmt:off
+        idx objParse( u8 byte );  // next input byte -> true: complete
+
+    protected:
         ObjDef& intObjDef( idx i ) { return (mObjDef[i]); }
 
+// @fmt:off
         u8*  intBytes( idx i ) { return (reinterpret_cast<u8 *>( &mObjDef[i] )); }
         u16* intU16( idx i ) { return (reinterpret_cast<u16 *>( &mObjDef[i] )); }
         u32* intU32( idx i ) { return (reinterpret_cast<u32 *>( &mObjDef[i] )); }
@@ -129,9 +134,9 @@ class Sml
         i64* intI64( idx i ) { return (reinterpret_cast<i64 *>( &mObjDef[i] )); }
 // @fmt:on
 
-        idx objParse( u8 byte );  // next input byte -> true: complete
+        const u32 * getErrCntArray() const { return mErrCnt; }
+        u32 getErrCnt( u8 idx ) const { return mErrCnt[ idx < Err::Unknown ? idx : Err::Unknown ]; }
 
-    protected:
         u16 mOffset;    // position in frame
         u16 mCrcRead;   // CRC from input data
         Crc mCrc;	    // updated on each byte received
@@ -142,6 +147,8 @@ class Sml
         u8 mByteCnt;                  // common byte counter
         idx mObjCnt;                  // next free object index
         idx mParsing;                 // pointer to currently parsed object
+        u32 mErrCnt[Err::Unknown + 1] {0};  // unknown errors accumulated to mErrCnt[Err::Unknown]
+
         // 4-byte alignment is fine, since either u64 is in SW anyway
         // (on 32-bit architecture) or we have to check alignment in newData()
         alignas(4) ObjDef mObjDef[cMaxNofObj];   // storage of objects
@@ -156,9 +163,7 @@ class Sml
             End			// 4x Bytes (CRC)  -> Status::EscBegin
         };
 
-        void objDump( idx o, u8 indent );
-
-    private:
+    protected:
         static const char sTypechar[];
         static const u8 sTypePlus1;
         static const u8 sTypeInt;
