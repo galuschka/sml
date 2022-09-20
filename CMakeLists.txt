@@ -6,7 +6,7 @@ enable_testing()
 
 add_executable(smldump  main.cpp crc16.cpp sml.cpp smldump.cpp smldumpinst.cpp)
 add_executable(obisdump main.cpp crc16.cpp sml.cpp smldump.cpp obis.cpp obisid.cpp obisunit.cpp obisdump.cpp)
-add_executable(mqttdump main.cpp crc16.cpp sml.cpp smldump.cpp obis.cpp filter.cpp mqttdump.cpp)
+add_executable(mqttdump main.cpp crc16.cpp sml.cpp obis.cpp filter.cpp mqttdump.cpp)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
