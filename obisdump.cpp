@@ -239,12 +239,7 @@ void SmlObis::obis()
                         } else {
                             u32 value = objValue.getU32( typematch );
                             if (!typematch) {
-                                value = objValue.getU16( typematch );
-                                if (!typematch) {
-                                    value = objValue.getU8( typematch );
-                                    if (!typematch)
-                                        break;
-                                }
+                                break;
                             }
 
                             char buf[12];

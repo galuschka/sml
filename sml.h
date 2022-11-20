@@ -15,7 +15,7 @@ typedef int64_t i64;
 
 typedef u16 idx;        // number of objects for extended output is close to 256
 
-const idx cMaxNofObj = 0x120;   // <- adjust according your needs
+const idx cMaxNofObj = 0x140;   // <- adjust according your needs
 const u8 cMaxListDepth = 10;  // while parsing nested list, we have to save old element counter
 const u8 cMinNofEscBegin = 3;  // ok, when Byte::Begin after 3 Byte::Escape
 const u8 cNofEscBegin = 4;    // usual number of Byte::Escape
@@ -252,90 +252,17 @@ class Obj
             return (typesize() == typesize( type, size ));
         }
 
-        const u8* bytes( u8 & len ) const
-        {
-            if (!isType( Type::ByteStr )) {
-                len = 0;
-                return (nullptr);
-            }
-            len = size();
-            if (len <= sizeof(idx))
-                return (u8*)(&objDef().mVal);
-            return (mSml.extBytes( objDef().mVal ));
-        }
+        const u8* bytes( u8 & len ) const;
 
-        u8 getU8( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Unsigned, 1 )) {
-                typematch = true;
-                return (intU8());
-            }
-            typematch = false;
-            return (0xff);
-        }
-        u16 getU16( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Unsigned, 2 )) {
-                typematch = true;
-                return (intU16());
-            }
-            typematch = false;
-            return (0xffff);
-        }
-        u32 getU32( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Unsigned, 4 )) {
-                typematch = true;
-                return (intU32());
-            }
-            typematch = false;
-            return (0xffffffff);
-        }
-        u64 getU64( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Unsigned, 8 )) {
-                typematch = true;
-                return (intU64());
-            }
-            typematch = false;
-            return (0xffffffffffffffff);
-        }
-        i8 getI8( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Integer, 1 )) {
-                typematch = true;
-                return (intI8());
-            }
-            typematch = false;
-            return (-1);
-        }
-        i16 getI16( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Integer, 2 )) {
-                typematch = true;
-                return (intI16());
-            }
-            typematch = false;
-            return (-1);
-        }
-        i32 getI32( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Integer, 4 )) {
-                typematch = true;
-                return (intI32());
-            }
-            typematch = false;
-            return (-1);
-        }
-        i64 getI64( bool & typematch ) const
-        {
-            if (typesize() == typesize( Type::Integer, 8 )) {
-                typematch = true;
-                return (intI64());
-            }
-            typematch = false;
-            return (-1);
-        }
+        u8 getU8( bool & typematch ) const;
+        u16 getU16( bool & typematch ) const;
+        u32 getU32( bool & typematch ) const;
+        u64 getU64( bool & typematch ) const;
+
+        i8 getI8( bool & typematch ) const;
+        i16 getI16( bool & typematch ) const;
+        i32 getI32( bool & typematch ) const;
+        i64 getI64( bool & typematch ) const;
 
         void dump( const char * name ) const;
 

@@ -301,3 +301,231 @@ idx Sml::objParse( u8 byte )
     }
     return (ret);
 }
+
+const u8* Obj::bytes( u8 & len ) const
+{
+    if (!isType( Type::ByteStr )) {
+        len = 0;
+        return (nullptr);
+    }
+    len = size();
+    if (len <= sizeof(idx))
+        return (u8*)(&objDef().mVal);
+    return (mSml.extBytes( objDef().mVal ));
+}
+
+u8 Obj::getU8( bool & typematch ) const
+{
+    if (typesize() == typesize( Type::Unsigned, 1 )) {
+        typematch = true;
+        return (intU8());
+    } else if (typesize() == typesize( Type::Integer, 1 )) {
+        if (intI8() >= 0) {
+            typematch = true;
+            return intI8();
+        }
+    }
+    typematch = false;
+    return (0xff);
+}
+i8 Obj::getI8( bool & typematch ) const
+{
+    if (typesize() == typesize( Type::Integer, 1 )) {
+        typematch = true;
+        return (intI8());
+    } else if (typesize() == typesize( Type::Unsigned, 1 )) {
+        if (intI8() >= 0) {
+            typematch = true;
+            return intI8();
+        }
+    }
+    typematch = false;
+    return (0x80);
+}
+
+u16 Obj::getU16( bool & typematch ) const
+{
+    if (isType(Type::Unsigned)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return intU8();
+            case 2: typematch = true;
+                    return intU16();
+        }
+    } else if (isType(Type::Integer)) {
+        switch (size()) {
+            case 1: if (intI8() >= 0) {
+                        typematch = true;
+                        return intU8();
+                    }
+                    break;
+            case 2: if (intI16() >= 0) {
+                        typematch = true;
+                        return intU16();
+                    }
+                    break;
+        }
+    }
+    typematch = false;
+    return (0xffff);
+}
+i16 Obj::getI16( bool & typematch ) const
+{
+    if (isType(Type::Integer)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return intI8();
+            case 2: typematch = true;
+                    return intI16();
+        }
+    } else if (isType(Type::Unsigned)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return (i16) intU8();
+            case 2: if (intI16() >= 0) {
+                        typematch = true;
+                        return intI16();
+                    }
+                    break;
+        }
+    }
+    typematch = false;
+    return (0x8000);
+}
+
+u32 Obj::getU32( bool & typematch ) const
+{
+    if (isType(Type::Unsigned)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return intU8();
+            case 2: typematch = true;
+                    return intU16();
+            case 3:
+            case 4: typematch = true;
+                    return intU32();
+        }
+    } else if (isType(Type::Integer)) {
+        switch (size()) {
+            case 1: if (intI8() >= 0) {
+                        typematch = true;
+                        return intU8();
+                    }
+                    break;
+            case 2: if (intI16() >= 0) {
+                        typematch = true;
+                        return intU16();
+                    }
+                    break;
+            case 3:
+            case 4: if (intI32() >= 0) {
+                        typematch = true;
+                        return intU32();
+                    }
+                    break;
+        }
+    }
+    typematch = false;
+    return (0xffffffff);
+}
+i32 Obj::getI32( bool & typematch ) const
+{
+    if (isType(Type::Integer)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return intI8();
+            case 2: typematch = true;
+                    return intI16();
+            case 3:
+            case 4: typematch = true;
+                    return intI32();
+        }
+    } else if (isType(Type::Unsigned)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return (i32) intU8();
+            case 2: typematch = true;
+                    return (i32) intU16();
+            case 3:
+            case 4: if (intI32() >= 0) {
+                        typematch = true;
+                        return intI32();
+                    }
+                    break;
+        }
+    }
+    typematch = false;
+    return (0x80000000);
+}
+
+u64 Obj::getU64( bool & typematch ) const
+{
+    if (isType(Type::Unsigned)) {
+        typematch = true;
+        switch (size()) {
+            case 1: return intU8();
+            case 2: return intU16();
+            case 3:
+            case 4: return intU32();
+            default: return intU64();
+        }
+    } else if (isType(Type::Integer)) {
+        switch (size()) {
+            case 1: if (intI8() >= 0) {
+                        typematch = true;
+                        return intU8();
+                    }
+                    break;
+            case 2: if (intI16() >= 0) {
+                        typematch = true;
+                        return intU16();
+                    }
+                    break;
+            case 3:
+            case 4: if (intI32() >= 0) {
+                        typematch = true;
+                        return intU32();
+                    }
+                    break;
+            default: if (intI64() >= 0) {
+                        typematch = true;
+                        return intU64();
+                    }
+                    break;
+        }
+    }
+    typematch = false;
+    return (0xffffffffffffffff);
+}
+i64 Obj::getI64( bool & typematch ) const
+{
+    if (isType(Type::Integer)) {
+        typematch = true;
+        switch (size()) {
+            case 1: return intI8();
+            case 2: return intI16();
+            case 3:
+            case 4: return intI32();
+            default: return intI64();
+
+        }
+    } else if (isType(Type::Unsigned)) {
+        switch (size()) {
+            case 1: typematch = true;
+                    return (i64) intU8();
+            case 2: typematch = true;
+                    return (i64) intU16();
+            case 3:
+            case 4: typematch = true;
+                    return (i64) intU32();
+
+            default: if (intI64() >= 0) {
+                        typematch = true;
+                        return intI64();
+                    }
+                    break;
+        }
+    }
+    typematch = false;
+    return (0x8000000000000000);
+}
