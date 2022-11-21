@@ -222,11 +222,6 @@ void SmlObis::obis()
                         u8 unit = objUnit.getU8( typematch );
                         const char * unitStr = Obis::unit2string( unit );
 
-                        if (unit == Obis::ListEntry::Unit::Wh) {
-                            scaler -= 3;
-                            unitStr = "kWh";
-                        }
-
                         if (!scaler) {
                             printObj( ", \"value\": ", objValue );
                             if (typematch) {
@@ -237,23 +232,10 @@ void SmlObis::obis()
                                     printf( "%d", unit );
                             }
                         } else {
-                            u32 value = objValue.getU32( typematch );
-                            if (!typematch) {
-                                break;
-                            }
-
                             char buf[12];
-                            char *cp = Obis::utoa( buf + 1, sizeof(buf) - 1, value );
-                            if (*cp == '#')
+                            char *cp = Obis::valScalToA( buf, sizeof(buf), objValue, objScaler );
+                            if (! cp)
                                 break;
-
-                            char *point = buf + sizeof(buf) - 2 + scaler;
-                            while (cp > point)
-                                *--cp = '0';    //      00xyz
-                            for (char *bp = --cp; bp < point; ++bp)
-                                bp[0] = bp[1];  // move integer part digits one ahead
-                            *point = '.';       // rstuv.wxyz
-
                             fputs( ", \"value\": ", stdout );
                             fputs( cp, stdout );
                             if (typematch) {

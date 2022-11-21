@@ -149,4 +149,87 @@ char* otoDevId( char * buf, u8 size, const Obj & obj )
     return devId;
 }
 
+// valScalToA - value and scaler to ascii:
+// buf/size     output buffer and size
+// objValue     object to value
+// objScaler    object to scaler
+// sep          nullptr or "" or ...
+//              "."  ->  1234.56 (use decimal point and no thousands sep)
+//              ",." -> 1,234.56 (use decimal point and thousands comma sep)
+//              ","  ->  1234,56 (use german decimal comma and no thousands sep)
+//              ".," -> 1.234,56 (use german decimal comma and thousands dot sep)
+//
+char * valScalToA( char * buf, u8 size, const Obj & objValue, const Obj & objScaler, const char *sep )
+{
+    char decSep = '.';
+    char kiloSep = 0;
+    if (sep && *sep) {
+        if (sep[1]) {
+            kiloSep = sep[0];
+            decSep = sep[1];
+        } else
+            decSep = *sep;
+    }
+
+    bool typematch;
+    i8 const scaler = objScaler.getI8( typematch );
+    if (! typematch)
+        return nullptr;  // no scaler or scaler type mismatch
+
+    u32 const u = objValue.getU32( typematch );
+    char *cp;
+    if (typematch)
+        cp = Obis::utoa( buf + 1, size - 1, u );
+    else {
+        i32 const i = objValue.getI32( typematch );
+        if (typematch)
+            cp = Obis::itoa( buf + 1, size - 1, i );
+        else
+            return nullptr;  // type mismatch
+    }
+    if (*cp == '#')
+        return nullptr;  // overflow
+
+    char * const end = buf + size - 1;
+    char * point = end;
+    if (scaler < 0) {
+        point = end - 1 + scaler;
+        while (cp > point)
+            *--cp = '0';    // add some leading zeros (example 00xyz -> 0.0xyz)
+        for (char *bp = --cp; bp < point; ++bp)
+            bp[0] = bp[1];  // move integer part digits one ahead (?uvwxyz -> uvvwxyz)
+        *point = decSep;    // uv.wxyz
+    }
+    else if (scaler > 0) {
+        cp -= scaler;
+        if (cp < buf)
+            return nullptr;  // overflow
+        char * zeros = end - scaler;
+        for (char *bp = cp; bp < zeros; ++bp)
+            *bp = bp[scaler];
+        while (zeros < end)
+            *zeros++ = 0;
+    }
+    if (kiloSep) {
+        // how many kilo seps?
+        u8 thousands = ((point - 1) - (cp + (*cp == '-' ? 1 : 0))) / 3;
+        if (thousands) {
+            cp -= thousands;
+            if (cp < buf)
+                return nullptr;  // overflow
+            char *kp = point - (4 * thousands);
+            for (char *bp = cp; bp < kp; ++bp)
+                *bp = bp[thousands];
+            for (u8 t = thousands; --t; kp += 4) {
+                kp[1] = kp[1 + t];
+                kp[2] = kp[2 + t];
+                kp[3] = kp[3 + t];
+            }
+            for (kp = point - 4; thousands--; kp -= 4)
+                *kp = kiloSep;
+        }
+    }
+    return cp;
+}
+
 }

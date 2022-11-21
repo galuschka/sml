@@ -106,6 +106,7 @@ bool isDeviceId( const Obj & obj );
 
 char * otoa( char * buf, u8 size, const Obj & obj, bool checkDevId = false );
 char * otoDevId( char * buf, u8 size, const Obj & obj );
+char * valScalToA( char * buf, u8 size, const Obj & objValue, const Obj & objScaler, const char *sep = nullptr );
 
 template<typename T> char * utoa( char * buf, u8 size, T x )
 {
