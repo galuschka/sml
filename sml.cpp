@@ -95,16 +95,10 @@ void Sml::parse( u8 byte )
                     break;
                 case 4:
                     mCrcRead |= (u16) byte << 8;
-                    if (mCrcRead != mCrc.get()) {
-                        ++mErrCnt[Err::CrcError];
-                        onReady( Err::CrcError, byte );
-                        mObjCnt = 0;
-                    } else {
-                        ++mErrCnt[Err::NoError];
-                        onReady( Err::NoError, byte );
-                        mObjCnt = 0;
-                    }
-                    mStatus = Status::EscBegin;
+                    if (mCrcRead != mCrc.get())
+                        abort( Err::CrcError, byte );
+                    else
+                        ready( byte );
                     break;
 
                 default:
@@ -116,13 +110,8 @@ void Sml::parse( u8 byte )
             mCrc.add( byte );
             mParsing = objParse( byte );
 
-            if (!mParsing && (mStatus != Status::Parse)) {
-                if (mStatus == Status::EscBegin) {
-                    ++mErrCnt[ mErr < Err::Unknown ? mErr : Err::Unknown ];
-                    onReady( mErr, byte );
-                    mByteCnt = 0;
-                    mObjCnt = 0;
-                }
+            if (!mParsing && (mStatus == Status::EscBegin)) {
+                ready( byte );
             }
             break;
 
@@ -152,18 +141,27 @@ void Sml::start()
      */
 }
 
-idx Sml::abort( u8 err )
+idx Sml::abort( u8 err, u8 byte )
 {
     mErr = err;
-    if (err == Err::NoError) {
-        mByteCnt = 1;
-        mStatus = Status::EscEnd;
-    } else {
-        mByteCnt = 0;
-        mStatus = Status::EscBegin;
-    }
-    return (0);
+    ready( byte );
+
+    return (0);  // used to pass to return(abort(...))
 }
+
+void Sml::ready( u8 byte )
+{
+    if (mObjCnt) {
+        fixup();  // optional to fix smart meter bug
+
+        ++mErrCnt[ mErr < Err::Unknown ? mErr : Err::Unknown ];
+        onReady( mErr, byte );
+    }
+    mStatus = Status::EscBegin;
+    mObjCnt = 0;
+    mByteCnt = byte == Byte::Escape ? 1 : 0;
+}
+
 
 idx Sml::newObj( u16 typeSize, idx parent )  // object constructor
 {
@@ -216,10 +214,10 @@ idx Sml::objParse( u8 byte )
                 break;
 
             if (byte == Byte::Escape)
-                return (abort( Err::NoError ));
+                return (abort( Err::NoError, byte ));
 
             if ((sTypeInvalid >> (byte >> Byte::TypeShift)) & 1)
-                return (abort( Err::InvalidType ));
+                return (abort( Err::InvalidType, byte ));
 
             if (s_typesize) {  // next byte for typesize construction:
                 s_typesize = Obj::typesize(
@@ -246,7 +244,7 @@ idx Sml::objParse( u8 byte )
                     link = &intObjDef( *link ).mNext;
                 idx const i = *link = newObj( typesize, mParsing );
                 if (!i)
-                    return (abort( Err::OutOfMemory ));
+                    return (abort( Err::OutOfMemory, byte ));
 
                 if ((Obj::type( typesize ) == Type::List) ||
                     (Obj::size( typesize ) != 0)) {

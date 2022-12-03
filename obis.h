@@ -85,9 +85,6 @@ enum ListEntry {
     Value           = 5, // <- SML_Value
     ValueSignature  = 6,    // SML_Signature OPTIONAL
 };
-enum Unit {
-    Wh = 30,
-};
 }
 
 

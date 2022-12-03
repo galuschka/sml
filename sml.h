@@ -84,15 +84,16 @@ class ObjDef
 
 class Sml
 {
-    public:
+    protected:
         Sml();
+    public:
         virtual ~Sml() = 0;
 
         static Sml & Instance();
 
-        void parse( u8 byte );  // parse next input byte
+        void parse( u8 byte );  // parse next input byte (will imply ready(), when complete)
+        virtual void onReady( u8 err, u8 byte ) = 0;  // called to pass to upper layer
 
-        virtual void onReady( u8 err, u8 byte ) = 0;  // method called on parsing complete/abort
         virtual void dump( const char * header = nullptr ) = 0;  // dump the struct
 
 // @fmt:off
@@ -113,8 +114,10 @@ class Sml
         }
 
     private:
-        void start();           // start parsing objects (behind esc begin)
-        idx abort( u8 err );    // set to abort parsing (error or end detection)
+        void start();                   // start parsing objects (behind esc begin)
+        idx  abort( u8 err, u8 byte );  // abort parsing (error)
+        void fixup();                   // fixup method (-> empty or not empty when need)
+        void ready( u8 byte );          // called inside parse() when complete or on abort()
 
         idx newObj( u16 typesize, idx parent );
         idx newData( u16 size );
@@ -206,10 +209,11 @@ class Obj
             }
         }
 
-        const ObjDef& objDef() const
-        {
-            return (mSml.extObjDef( mIdx ));
-        }
+        operator bool() const { return (mIdx != 0) && (mIdx < mSml.objCnt()); }
+        idx  objIdx()   const { return mIdx; }
+
+        const ObjDef& objDef() const { return (mSml.extObjDef( mIdx )); }
+
         u16 typesize() const
         {
             if (!mIdx || (mIdx >= mSml.objCnt()))
@@ -217,27 +221,12 @@ class Obj
             return (objDef().mTypeSize);
         }
 
-        static u16 typesize( u8 type, u16 size )
-        {
-            return (((u16) type) << 8) | size;
-        }
-        static u8 type( u16 typesize )
-        {
-            return ((typesize >> 8) & Byte::TypeMask);
-        }
-        static u16 size( u16 typesize )
-        {
-            return (typesize & ((Byte::SizeMask << 8) | 0xff));
-        }
+        static u16 typesize( u8 type, u16 size ) { return (((u16) type) << 8) | size; }
+        static u8  type( u16 typesize ) { return ((typesize >> 8) & Byte::TypeMask); }
+        static u16 size( u16 typesize ) { return (typesize & ((Byte::SizeMask << 8) | 0xff)); }
 
-        u8 type() const
-        {
-            return (type( typesize() ));
-        }
-        u16 size() const
-        {
-            return (size( typesize() ));
-        }
+        u8  type() const { return (type( typesize() )); }
+        u16 size() const { return (size( typesize() )); }
 
         bool isType( u8 cmptype ) const
         {
