@@ -118,12 +118,12 @@ void SmlDump::objDump( idx o, u8 indent )
                     break;
                 case 3:
                 case 4:
-                    printf( "0x%0*x = %d\n", size * 2, *intU32( p.mVal ),
-                            *intI32( p.mVal ) );
+                    printf( "0x%0*x = %d\n", size * 2, *intU32ptr( p.mVal ),
+                            *intI32ptr( p.mVal ) );
                     break;
                 default:
-                    printf( "0x%0*lx = %ld\n", size * 2, *intU64( p.mVal ),
-                            *intI64( p.mVal ) );
+                    printf( "0x%0*lx = %ld\n", size * 2, *intU64ptr( p.mVal ),
+                            *intI64ptr( p.mVal ) );
                     break;
             }
             break;
@@ -140,12 +140,12 @@ void SmlDump::objDump( idx o, u8 indent )
                     break;
                 case 3:
                 case 4:
-                    printf( "0x%0*x = %u\n", size * 2, *intU32( p.mVal ),
-                            *intU32( p.mVal ) );
+                    printf( "0x%0*x = %u\n", size * 2, *intU32ptr( p.mVal ),
+                            *intU32ptr( p.mVal ) );
                     break;
                 default:
-                    printf( "0x%0*lx = %lu\n", size * 2, *intU64( p.mVal ),
-                            *intU64( p.mVal ) );
+                    printf( "0x%0*lx = %lu\n", size * 2, *intU64ptr( p.mVal ),
+                            *intU64ptr( p.mVal ) );
                     break;
             }
             break;

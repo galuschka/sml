@@ -128,13 +128,11 @@ class Sml
         ObjDef& intObjDef( idx i ) { return (mObjDef[i]); }
 
 // @fmt:off
-        u8*  intBytes( idx i ) { return (reinterpret_cast<u8 *>( &mObjDef[i] )); }
-        u16* intU16( idx i ) { return (reinterpret_cast<u16 *>( &mObjDef[i] )); }
-        u32* intU32( idx i ) { return (reinterpret_cast<u32 *>( &mObjDef[i] )); }
-        u64* intU64( idx i ) { return (reinterpret_cast<u64 *>( &mObjDef[i] )); }
-        i16* intI16( idx i ) { return (reinterpret_cast<i16 *>( &mObjDef[i] )); }
-        i32* intI32( idx i ) { return (reinterpret_cast<i32 *>( &mObjDef[i] )); }
-        i64* intI64( idx i ) { return (reinterpret_cast<i64 *>( &mObjDef[i] )); }
+        u8*  intBytes(  idx i ) { return (reinterpret_cast<u8  *>( &mObjDef[i] )); }
+        u32* intU32ptr( idx i ) { return (reinterpret_cast<u32 *>( &mObjDef[i] )); }
+        u64* intU64ptr( idx i ) { return (reinterpret_cast<u64 *>( &mObjDef[i] )); }
+        i32* intI32ptr( idx i ) { return (reinterpret_cast<i32 *>( &mObjDef[i] )); }
+        i64* intI64ptr( idx i ) { return (reinterpret_cast<i64 *>( &mObjDef[i] )); }
 // @fmt:on
 
         const u32 * getErrCntArray() const { return mErrCnt; }

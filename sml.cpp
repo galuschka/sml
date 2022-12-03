@@ -197,7 +197,7 @@ idx Sml::newData( u16 size )
         return (0);
     const idx ret = mObjCnt;
     mObjCnt += nofObjs;
-    memset( intBytes( ret ), 0, size );
+    memset( intBytes( ret ), 0, nofObjs * sizeof(ObjDef) );
     return (ret);
 }
 
@@ -207,7 +207,7 @@ idx Sml::objParse( u8 byte )
     u16 typesize;
 
     ObjDef &p = intObjDef( mParsing );
-    switch (Obj::type( p.mTypeSize ) & Byte::TypeMask)
+    switch (Obj::type( p.mTypeSize ))
     {
         case Type::List:
             if (byte == Byte::MsgEnd)
@@ -266,21 +266,31 @@ idx Sml::objParse( u8 byte )
             break;
 
         default:
+            // signed/unsigned: when signed and MSBit set: preset with ffff...
+            if ((! mByteCnt) && (byte & 0x80) && (Obj::type( p.mTypeSize ) == Type::Integer))
+            {
+                const u16 size = Obj::size( p.mTypeSize );
+                if (size > sizeof(idx)) {
+                    u8 nofI32 = (u8) ((size + sizeof(u32) - 1) / sizeof(u32));
+                    i32 *i32ptr = intI32ptr( p.mVal );
+                    while (nofI32--)
+                        *i32ptr++ = -1;
+                } else
+                    p.mVal = (idx) -1;
+            }
             switch (Obj::size( p.mTypeSize ))
             {
                 case 0:
                 case 1:
-                    p.mVal = byte;
-                    break;
                 case 2:
                     p.mVal = (p.mVal << 8) | byte;
                     break;
                 case 3:
                 case 4:
-                    *intU32( p.mVal ) = (*intU32( p.mVal ) << 8) | byte;
+                    *intU32ptr( p.mVal ) = (*intU32ptr( p.mVal ) << 8) | byte;
                     break;
                 default:
-                    *intU64( p.mVal ) = (*intU64( p.mVal ) << 8) | byte;
+                    *intU64ptr( p.mVal ) = (*intU64ptr( p.mVal ) << 8) | byte;
                     break;
             }
             break;

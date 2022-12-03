@@ -45,8 +45,23 @@ void Sml::fixup()
                 continue;
 
             Obj objValue { objElem, Obis::ListEntry::Value };
-            if (objValue.typesize() == Obj::typesize( Type::Integer, 2 ))
-                mObjDef[ objValue.objIdx() ].mTypeSize = Obj::typesize( Type::Unsigned, 2 );
+            if (objValue.isType( Type::Integer ))
+            {
+                // here we toogle signed to unsigned encoding:
+                mObjDef[ objValue.objIdx() ].mTypeSize ^= Obj::typesize( Type::Unsigned ^ Type::Integer, 0 );
+
+                // When we got i8  (type 0x52) and bit  8 was set (e.g. c4), we have set the value to 0xffc4
+                // When we got i24 (type 0x54) and bit 23 was set (e.g. 92 34 56), we have set value 0xff923456
+                // Here we undo filling the leading 0xff's in these cases:
+                switch (objValue.size())
+                {
+                    case 1:     mObjDef[ objValue.objIdx() ].mVal  &= 0xff; break;
+                    case 3: *(intU32ptr( objValue.objDef().mVal )) &= 0xffffff; break;
+                    case 5: *(intU64ptr( objValue.objDef().mVal )) &= 0xffffffffff; break;
+                    case 6: *(intU64ptr( objValue.objDef().mVal )) &= 0xffffffffffff; break;
+                    case 7: *(intU64ptr( objValue.objDef().mVal )) &= 0xffffffffffffff; break;
+                }
+            }
             return;
         }
     }
