@@ -39,8 +39,6 @@ void Sml::fixup()
             if (len < 6)
                 continue;
 
-            // 1-0:36.7.0*255": Sum active instantaneous power without reverse blockade (A+ - A-) in phase L1
-            static u8 measIdToFix[] = {1,0,36,7,0};
             if (memcmp( measId, measIdToFix, sizeof(measIdToFix)))
                 continue;
 
@@ -50,8 +48,10 @@ void Sml::fixup()
                 // here we toogle signed to unsigned encoding:
                 mObjDef[ objValue.objIdx() ].mTypeSize ^= Obj::typesize( Type::Unsigned ^ Type::Integer, 0 );
 
-                // When we got i8  (type 0x52) and bit  8 was set (e.g. c4), we have set the value to 0xffc4
-                // When we got i24 (type 0x54) and bit 23 was set (e.g. 92 34 56), we have set value 0xff923456
+                // When we got i8  (type 0x52) and bit  8 was set (e.g. c4),       we have set the i16 value to 0xffc4
+                // When we got i24 (type 0x54) and bit 23 was set (e.g. 92 34 56), we have set the i32 value to 0xff923456
+                // etc. for long long
+
                 // Here we undo filling the leading 0xff's in these cases:
                 switch (objValue.size())
                 {

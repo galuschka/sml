@@ -268,6 +268,4 @@ class Obj
 
         const Sml &mSml;
         idx mIdx;
-
-        // friend class Sml;
 };
