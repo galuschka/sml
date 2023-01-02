@@ -134,10 +134,10 @@ class Sml
         i32* intI32ptr( idx i ) { return (reinterpret_cast<i32 *>( &mObjDef[i] )); }
         i64* intI64ptr( idx i ) { return (reinterpret_cast<i64 *>( &mObjDef[i] )); }
 // @fmt:on
-
+    public:
         const u32 * getErrCntArray() const { return mErrCnt; }
         u32 getErrCnt( u8 idx ) const { return mErrCnt[ idx < Err::Unknown ? idx : Err::Unknown ]; }
-
+    protected:
         u16 mOffset;    // position in frame
         u16 mCrcRead;   // CRC from input data
         Crc mCrc;	    // updated on each byte received
