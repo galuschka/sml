@@ -46,6 +46,12 @@ void SmlDumpInst::onReady( u8 err, u8 byte )
                mCrcRead, mCrc.get());
         break;
 
+    case Err::Timeout:
+        printf("\n!!! timeout, while frame not complete !!!"
+               " (obj.count: %d, status: %d)\n",
+               objCnt(), status());
+        break;
+
     default:
         printf("\n!!! unknown error %d: (char %02x at offset %d) !!!"
                " (the following packet is invalid)\n",

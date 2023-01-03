@@ -66,6 +66,7 @@ enum Err
     OutOfMemory,	// cMaxNofObj too small
     InvalidType,
     CrcError,
+    Timeout,        // timeout can be used to force abort parsing
 
     Unknown         // number of error types and index for invalid err values
 };
@@ -96,6 +97,7 @@ class Sml
 
         virtual void dump( const char * header = nullptr ) = 0;  // dump the struct
 
+        void timeout();  // can be called to force abort parsing (e.g. on >= 2 bytes delay)
         const u32 * getErrCntArray() const { return mErrCnt; }
         u32 getErrCnt( u8 idx ) const { return mErrCnt[ idx < Err::Unknown ? idx : Err::Unknown ]; }
 
@@ -111,16 +113,13 @@ class Sml
         i64 extI64( idx i ) const { return (*reinterpret_cast<i64 const *>( &mObjDef[i] )); }
 // @fmt:on
 
-        idx objCnt() const
-        {
-            return mObjCnt;
-        }
+        idx objCnt() const { return mObjCnt; }
+        u8 status() const { return mStatus; }
 
     private:
         void start();                   // start parsing objects (behind esc begin)
-        idx  abort( u8 err, u8 byte );  // abort parsing (error)
+        idx  ready( u8 err, u8 byte );  // ready parsing (complete or error)
         void fixup();                   // fixup method (-> empty or not empty when need)
-        void ready( u8 byte );          // called inside parse() when complete or on abort()
 
         idx newObj( u16 typesize, idx parent );
         idx newData( u16 size );

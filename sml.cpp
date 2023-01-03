@@ -96,9 +96,9 @@ void Sml::parse( u8 byte )
                 case 4:
                     mCrcRead |= (u16) byte << 8;
                     if (mCrcRead != mCrc.get())
-                        abort( Err::CrcError, byte );
+                        ready( Err::CrcError, byte );
                     else
-                        ready( byte );
+                        ready( Err::NoError, byte );;
                     break;
 
                 default:
@@ -109,10 +109,6 @@ void Sml::parse( u8 byte )
         case Status::Parse:
             mCrc.add( byte );
             mParsing = objParse( byte );
-
-            if (!mParsing && (mStatus == Status::EscBegin)) {
-                ready( byte );
-            }
             break;
 
         default:
@@ -141,16 +137,14 @@ void Sml::start()
      */
 }
 
-idx Sml::abort( u8 err, u8 byte )
+void Sml::timeout()
 {
-    mErr = err;
-    ready( byte );
-
-    return (0);  // used to pass to return(abort(...))
+    ready( Err::Timeout, 0 );
 }
 
-void Sml::ready( u8 byte )
+idx Sml::ready( u8 err, u8 byte )
 {
+    mErr = err;
     if (mObjCnt) {
         fixup();  // optional to fix smart meter bug
 
@@ -160,8 +154,9 @@ void Sml::ready( u8 byte )
     mStatus = Status::EscBegin;
     mObjCnt = 0;
     mByteCnt = byte == Byte::Escape ? 1 : 0;
-}
 
+    return (0);  // used to pass to return(ready(...))
+}
 
 idx Sml::newObj( u16 typeSize, idx parent )  // object constructor
 {
@@ -213,11 +208,14 @@ idx Sml::objParse( u8 byte )
             if (byte == Byte::MsgEnd)
                 break;
 
-            if (byte == Byte::Escape)
-                return (abort( Err::NoError, byte ));
+            if (byte == Byte::Escape) {
+                mByteCnt = 1;
+                mStatus = Status::EscEnd;
+                return 0;
+            }
 
             if ((sTypeInvalid >> (byte >> Byte::TypeShift)) & 1)
-                return (abort( Err::InvalidType, byte ));
+                return (ready( Err::InvalidType, byte ));
 
             if (s_typesize) {  // next byte for typesize construction:
                 s_typesize = Obj::typesize(
@@ -244,7 +242,7 @@ idx Sml::objParse( u8 byte )
                     link = &intObjDef( *link ).mNext;
                 idx const i = *link = newObj( typesize, mParsing );
                 if (!i)
-                    return (abort( Err::OutOfMemory, byte ));
+                    return (ready( Err::OutOfMemory, byte ));
 
                 if ((Obj::type( typesize ) == Type::List) ||
                     (Obj::size( typesize ) != 0)) {

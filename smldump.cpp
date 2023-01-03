@@ -33,10 +33,11 @@ void SmlDump::dump( const char * header )
         const u32 * errCnt = getErrCntArray();
         printf( "valid packets: %8u\n",   errCnt[Err::NoError] );
         printf( "out of memory: %8u%s\n", errCnt[Err::OutOfMemory],
-                                        errCnt[Err::OutOfMemory]
+                                          errCnt[Err::OutOfMemory]
                                     ? " -> increase cMaxNofObj in sml.h!" : "" );
         printf( "type errors:   %8u\n",   errCnt[Err::InvalidType] );
         printf( "CRC errors:    %8u\n",   errCnt[Err::CrcError] );
+        printf( "timeout errors:%8u\n",   errCnt[Err::Timeout] );
         printf( "unknown errors:%8u\n",   errCnt[Err::Unknown] );
     }
 }
