@@ -113,8 +113,9 @@ class Sml
         i64 extI64( idx i ) const { return (*reinterpret_cast<i64 const *>( &mObjDef[i] )); }
 // @fmt:on
 
-        idx objCnt() const { return mObjCnt; }
-        u8 status() const { return mStatus; }
+        idx objCnt()  const { return mObjCnt; }
+        u8  status()  const { return mStatus; }
+        idx parsing() const { return mParsing; }
 
     private:
         void start();                   // start parsing objects (behind esc begin)
