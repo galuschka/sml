@@ -99,7 +99,7 @@ class Sml
 
         void timeout();  // can be called to force abort parsing (e.g. on >= 2 bytes delay)
         const u32 * getErrCntArray() const { return mErrCnt; }
-        u32 getErrCnt( u8 idx ) const { return mErrCnt[ idx < Err::Unknown ? idx : Err::Unknown ]; }
+        u32 getErrCnt( u8 idx ) const { return mErrCnt[ idx < Err::Unknown ? idx : (u8) Err::Unknown ]; }
 
 // @fmt:off
         const ObjDef& extObjDef( idx i ) const { return (mObjDef[i]); }

@@ -148,7 +148,7 @@ idx Sml::ready( u8 err, u8 byte )
     if (mObjCnt) {
         fixup();  // optional to fix smart meter bug
 
-        ++mErrCnt[ mErr < Err::Unknown ? mErr : Err::Unknown ];
+        ++mErrCnt[ mErr < Err::Unknown ? mErr : (u8) Err::Unknown ];
         onReady( mErr, byte );
     }
     mStatus = Status::EscBegin;
